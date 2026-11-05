@@ -487,6 +487,37 @@ body {
   text-transform: uppercase;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* --- Paneles añadidos (prueba con Hermes y Claude) --- */
+#vpanel { position: fixed; left: 86px; top: 50%; transform: translateY(-50%) translateX(-12px); width: min(420px, calc(100vw - 110px));
+  max-height: 78vh; overflow: auto; background: rgba(18,18,30,0.94); color: #e8e8f0; border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 16px; padding: 18px 18px 14px; z-index: 60; opacity: 0; pointer-events: none; transition: .2s; font-size: 13.5px;
+  backdrop-filter: blur(10px); box-shadow: 0 20px 50px rgba(0,0,0,.45); }
+#vpanel.open { opacity: 1; pointer-events: auto; transform: translateY(-50%); }
+#vpanel h3 { margin: 0 0 10px; font-size: 16px; display: flex; justify-content: space-between; align-items: center; }
+#vpanel h4 { margin: 14px 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: #9a9ab0; }
+#vpanel .x { background: none; border: 0; color: #9a9ab0; font-size: 18px; cursor: pointer; }
+#vpanel .row { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,.06); }
+#vpanel .row span:last-child { color: #b8b8cc; text-align: right; }
+#vpanel .pill { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 11.5px; background: rgba(255,255,255,.08); }
+#vpanel .ok { color: #34d399 } #vpanel .warn { color: #fbbf24 } #vpanel .bad { color: #f87171 }
+#vpanel .bar { height: 7px; border-radius: 99px; background: rgba(255,255,255,.08); overflow: hidden; margin-top: 4px; }
+#vpanel .bar i { display: block; height: 100%; background: #8B5CF6; }
+#vpanel .muted { color: #8a8aa0; font-size: 12px; }
+#vpanel label.opt { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; cursor: pointer; }
+#lockscreen { position: fixed; inset: 0; z-index: 90; display: none; place-items: center; background: rgba(8,8,14,.82);
+  backdrop-filter: blur(18px); color: #e8e8f0; text-align: center; }
+#lockscreen.on { display: grid; }
+#lockscreen button { margin-top: 14px; padding: 10px 18px; border-radius: 10px; border: 1px solid rgba(255,255,255,.2);
+  background: rgba(255,255,255,.08); color: #fff; cursor: pointer; font-size: 14px; }
+
+/* La ficha del agente va a la derecha para no tapar al agente enfocado */
+#detail-panel { left: auto !important; right: 24px; transform: translateY(-50%) translateX(16px) !important; max-height: 80vh; overflow: auto; }
+#detail-panel.open { transform: translateY(-50%) !important; }
+#focusBar { position: fixed; top: 86px; left: 50%; transform: translateX(-50%); z-index: 70; display: none; gap: 8px; align-items: center;
+  background: rgba(18,18,30,0.9); color: #e8e8f0; border: 1px solid rgba(255,255,255,0.12); border-radius: 99px; padding: 6px 8px 6px 14px; font-size: 13px; }
+#focusBar.on { display: flex; }
+#focusBar button { border: 0; border-radius: 99px; padding: 6px 12px; cursor: pointer; background: rgba(255,255,255,0.1); color: #fff; font-size: 13px; }
 </style>
 </head>
 <body>
@@ -507,24 +538,24 @@ body {
     <div class="notif-title"><span class="notif-pulse"></span> Gathering in meeting room...</div>
     <div class="notif-sub" id="meetingSub">4/5 attending — Daily standup</div>
   </div>
-  <button class="standup-btn">Standup Board</button>
+  <button class="standup-btn" title="Estado del equipo">Equipo</button>
 
   <div class="left-sidebar">
-    <div class="sidebar-icon active" data-view="office">🏢</div>
-    <div class="sidebar-icon" data-view="tasks">📋</div>
-    <div class="sidebar-icon" data-view="metrics">📊</div>
-    <div class="sidebar-icon" data-view="settings">⚙️</div>
-    <div class="sidebar-icon" data-view="lock">🔒</div>
+    <div class="sidebar-icon active" data-view="office" title="Oficina">🏢</div>
+    <div class="sidebar-icon" data-view="tasks" title="Tareas">📋</div>
+    <div class="sidebar-icon" data-view="metrics" title="Servidor">📊</div>
+    <div class="sidebar-icon" data-view="settings" title="Ajustes">⚙️</div>
+    <div class="sidebar-icon" data-view="lock" title="Bloquear">🔒</div>
   </div>
 
   <div class="right-sidebar">
-    <div class="right-label">Open</div>
-    <div class="right-label">Marketplace</div>
-    <div class="right-label">Analytics</div>
+    <div class="right-label" data-open="metrics">Servidor</div>
+    <div class="right-label" data-open="tasks">Tareas</div>
+    <div class="right-label" data-open="activity">Actividad</div>
   </div>
 
   <div class="status-footer" id="statusFooter"></div>
-  <button class="chat-btn">Chat</button>
+  <button class="chat-btn" title="Actividad reciente">Actividad</button>
 
   <div class="controls">
     <button class="ctrl-btn" id="zoomIn">+</button>
@@ -532,6 +563,12 @@ body {
     <button class="ctrl-btn" id="rotateBtn">↻</button>
     <button class="ctrl-btn active" id="labelsBtn" title="Toggle labels">🏷</button>
   </div>
+
+  <div id="focusBar"><span id="focusName"></span><button id="focusInfo">Ficha</button><button id="focusExit">🏢 Vista general</button></div>
+  <div id="vpanel" role="dialog" aria-live="polite"></div>
+  <div id="lockscreen"><div><div style="font-size:42px">🔒</div><div style="font-size:18px;font-weight:700;margin-top:8px">Panel bloqueado</div>
+    <div class="muted" style="opacity:.7">La información queda oculta hasta que lo desbloquees.</div>
+    <button id="unlockBtn">Desbloquear</button></div></div>
 
   <div id="detail-panel">
     <div class="detail-header">
@@ -634,8 +671,13 @@ let clock, selectedAgent = null;
 let lastMeetingUpdate = 0;
 let liveConfig = { mode: 'demo', enable_sse: true };
 
+let liveIds = '';
 function applyLiveAgents(newAgents) {
-  // Update existing / add new agents
+  // Live data replaces the demo cast (they used to be appended to it).
+  const ids = newAgents.map(a => a.id).sort().join(',');
+  for (let i = AGENTS.length - 1; i >= 0; i--) {
+    if (!newAgents.some(na => na.id === AGENTS[i].id)) { delete agentStates[AGENTS[i].id]; AGENTS.splice(i, 1); }
+  }
   newAgents.forEach(na => {
     const existing = AGENTS.find(a => a.id === na.id);
     if (existing) {
@@ -652,11 +694,16 @@ function applyLiveAgents(newAgents) {
     }
     if (na.stats) agentStats[na.id] = na.stats;
   });
-  createAgents();
-  setupUI();
+  liveConfig.mode = 'live';
+  // Rebuilding every 5 s snapped everyone back home: only rebuild when agents come or go.
+  if (ids !== liveIds) {
+    liveIds = ids;
+    createAgents();
+    setupUI();
+    showToast('Live agents synced');
+  }
   updateStatusBar();
   if (selectedAgent) selectAgent(selectedAgent.id);
-  showToast('Live agents synced');
 }
 
 async function fetchAgents() {
@@ -736,7 +783,7 @@ function init() {
       document.getElementById('labelsBtn').classList.toggle('active', labelsVisible);
       labels.forEach(l => l.visible = labelsVisible);
     });
-    document.getElementById('detailClose').addEventListener('click', closeDetail);
+    document.getElementById('detailClose').addEventListener('click', () => closeDetail());
     document.getElementById('userBar').addEventListener('click', (e) => {
       const avatar = e.target.closest('.user-avatar');
       if (avatar) selectAgent(avatar.dataset.agent);
@@ -1744,6 +1791,20 @@ function updateBehavior() {
   AGENTS.forEach(agent => {
     const state = agentStates[agent.id];
     const rand = Math.random();
+    if (liveConfig.mode === 'live') {
+      // Working: at the desk, shifting a little. Idle: wanders around the office.
+      if (agent.status === 'working') {
+        const home = getHomePosition(agent.home);
+        state.targetX = home.x + (Math.random() - 0.5) * 0.8;
+        state.targetZ = home.z + (Math.random() - 0.5) * 0.8;
+      } else if (rand < 0.5) {
+        state.targetX = (Math.random() - 0.5) * (ROOM_WIDTH - 8);
+        state.targetZ = (Math.random() - 0.5) * (ROOM_DEPTH - 8);
+      }
+      state.status = agent.status || 'idle';
+      state.task = agent.task || state.task;
+      return;
+    }
     
     if (rand < 0.35) {
       state.status = 'meeting';
@@ -1775,12 +1836,21 @@ function updateBehavior() {
   });
   
   // Update meeting notification
-  document.getElementById('meetingSub').textContent = `${Math.max(meetingCount, 2)}/5 attending — Daily standup`;
+  if (liveConfig.mode !== 'live') document.getElementById('meetingSub').textContent = `${Math.max(meetingCount, 2)}/5 attending — Daily standup`;
   
   updateStatusBar();
 }
 
 function spawnRandomChat() {
+  if (liveConfig.mode === 'live') {
+    // Now and then, a working agent shows what it is really doing.
+    const busy = agents.filter(a => a.agent.status === 'working' && !a.activeBubble);
+    if (busy.length && Math.random() < 0.3) {
+      const a = busy[Math.floor(Math.random() * busy.length)];
+      showChatBubble(a, (a.agent.task || '').slice(0, 22));
+    }
+    return;
+  }
   // Find agents close together; throttle so bubbles don't stack
   const chatMessages = ['Nice work!', 'LGTM', 'Can you review?', 'On it', 'Coffee?', 'Standup?', 'Synced'];
   const now = Date.now();
@@ -1795,6 +1865,7 @@ function spawnRandomChat() {
       
       const dist = a1.group.position.distanceTo(a2.group.position);
       
+      if (liveConfig.mode === 'live') break;
       if (dist < 3.2 && Math.random() > 0.75) {
         const msg = chatMessages[Math.floor(Math.random() * chatMessages.length)];
         showChatBubble(a1, msg);
@@ -2062,7 +2133,7 @@ function animate() {
   // Update meeting notification periodically
   if (Date.now() - lastMeetingUpdate > 5000) {
     const meetingCount = AGENTS.filter(a => agentStates[a.id].status === 'meeting').length;
-    document.getElementById('meetingSub').textContent = `${Math.max(meetingCount, 1)}/5 attending — Daily standup`;
+    if (liveConfig.mode !== 'live') document.getElementById('meetingSub').textContent = `${Math.max(meetingCount, 1)}/5 attending — Daily standup`;
     updateStatusBar();
     lastMeetingUpdate = Date.now();
   }
@@ -2077,7 +2148,386 @@ function animate() {
   renderer.render(scene, camera);
 }
 
+
+/* --- Navegación: no atravesar muebles y sentarse en su puesto (añadido) --- */
+const NAV = { cell: 0.35, w: 0, h: 0, grid: null, chairs: [], seats: {} };
+(function () {
+  const _createChair = createChair;
+  createChair = function (x, z, rotation, color) {
+    const g = _createChair(x, z, rotation, color);
+    NAV.chairs.push({ x, z, rot: rotation, group: g });
+    return g;
+  };
+  const _createFurniture = createFurniture;
+  createFurniture = function () {
+    const before = new Set(scene.children);
+    _createFurniture();
+    buildNavGrid(scene.children.filter((c) => !before.has(c)));
+  };
+})();
+
+function toCell(x, z) {
+  return [Math.floor((x + ROOM_WIDTH / 2) / NAV.cell), Math.floor((z + ROOM_DEPTH / 2) / NAV.cell)];
+}
+function toWorld(i, j) {
+  return { x: (i + 0.5) * NAV.cell - ROOM_WIDTH / 2, z: (j + 0.5) * NAV.cell - ROOM_DEPTH / 2 };
+}
+function navFree(i, j) {
+  return i >= 0 && j >= 0 && i < NAV.w && j < NAV.h && !NAV.grid[j * NAV.w + i];
+}
+
+function buildNavGrid(objects) {
+  NAV.w = Math.ceil(ROOM_WIDTH / NAV.cell);
+  NAV.h = Math.ceil(ROOM_DEPTH / NAV.cell);
+  NAV.grid = new Uint8Array(NAV.w * NAV.h);
+  const R = 0.32; // agent radius
+  const margin = 1.1; // keep away from the walls
+  for (let j = 0; j < NAV.h; j++) for (let i = 0; i < NAV.w; i++) {
+    const p = toWorld(i, j);
+    if (Math.abs(p.x) > ROOM_WIDTH / 2 - margin || Math.abs(p.z) > ROOM_DEPTH / 2 - margin) NAV.grid[j * NAV.w + i] = 1;
+  }
+  const box = new THREE.Box3();
+  objects.forEach((o) => {
+    box.setFromObject(o);
+    if (box.isEmpty()) return;
+    if (box.max.y < 0.12) return;               // rugs, floor markings
+    if (box.min.y > 1.2) return;                // things on the walls / ceiling
+    const area = (box.max.x - box.min.x) * (box.max.z - box.min.z);
+    if (area > 120) return;                     // floor-sized meshes
+    const [i0, j0] = toCell(box.min.x - R, box.min.z - R);
+    const [i1, j1] = toCell(box.max.x + R, box.max.z + R);
+    for (let j = Math.max(0, j0); j <= Math.min(NAV.h - 1, j1); j++)
+      for (let i = Math.max(0, i0); i <= Math.min(NAV.w - 1, i1); i++) NAV.grid[j * NAV.w + i] = 1;
+  });
+  // Desk seats: the chair each workstation created, keyed by its home position.
+  ['meeting', 'left', 'center', 'right', 'right2'].forEach((home) => {
+    const h = getHomePosition(home);
+    let best = null, bd = 1e9;
+    NAV.chairs.forEach((c) => { const d = Math.hypot(c.x - h.x, c.z - h.z); if (d < bd && d < 2.5) { bd = d; best = c; } });
+    if (best) NAV.seats[home] = { x: best.x, z: best.z, face: Math.atan2(h.x - best.x, h.z - best.z) };
+  });
+}
+
+function nearestFree(i, j) {
+  if (navFree(i, j)) return [i, j];
+  for (let r = 1; r < 30; r++)
+    for (let dj = -r; dj <= r; dj++) for (let di = -r; di <= r; di++)
+      if ((Math.abs(di) === r || Math.abs(dj) === r) && navFree(i + di, j + dj)) return [i + di, j + dj];
+  return [i, j];
+}
+
+function lineFree(a, b) {
+  const steps = Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / (NAV.cell * 0.5));
+  for (let k = 1; k < steps; k++) {
+    const [i, j] = toCell(a.x + (b.x - a.x) * k / steps, a.z + (b.z - a.z) * k / steps);
+    if (!navFree(i, j)) return false;
+  }
+  return true;
+}
+
+// A* over the grid, 8 directions without cutting corners, then straightened.
+function findPath(from, to, allowGoal) {
+  if (!NAV.grid) return [to];
+  const [si, sj] = nearestFree(...toCell(from.x, from.z));
+  let [gi, gj] = toCell(to.x, to.z);
+  const goalBlocked = !navFree(gi, gj);
+  if (goalBlocked) [gi, gj] = nearestFree(gi, gj);
+  const W = NAV.w, start = sj * W + si, goal = gj * W + gi;
+  const g = new Float32Array(W * NAV.h).fill(Infinity), came = new Int32Array(W * NAV.h).fill(-1);
+  const open = [[0, start]]; g[start] = 0;
+  const hf = (n) => Math.hypot((n % W) - gi, Math.floor(n / W) - gj);
+  let found = false, guard = 0;
+  while (open.length && guard++ < 20000) {
+    let bi = 0; for (let k = 1; k < open.length; k++) if (open[k][0] < open[bi][0]) bi = k;
+    const [, n] = open.splice(bi, 1)[0];
+    if (n === goal) { found = true; break; }
+    const ni = n % W, nj = Math.floor(n / W);
+    for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+      if (!di && !dj) continue;
+      const i = ni + di, j = nj + dj;
+      if (!navFree(i, j)) continue;
+      if (di && dj && (!navFree(ni + di, nj) || !navFree(ni, nj + dj))) continue;
+      const m = j * W + i, cost = g[n] + (di && dj ? 1.414 : 1);
+      if (cost < g[m]) { g[m] = cost; came[m] = n; open.push([cost + hf(m), m]); }
+    }
+  }
+  if (!found) return [toWorld(gi, gj)];
+  const cells = [];
+  for (let n = goal; n !== -1; n = came[n]) cells.unshift(toWorld(n % W, Math.floor(n / W)));
+  const pts = [];
+  let anchor = { x: from.x, z: from.z };
+  for (let k = 1; k < cells.length; k++) {
+    if (!lineFree(anchor, cells[k])) { pts.push(cells[k - 1]); anchor = cells[k - 1]; }
+  }
+  pts.push(cells[cells.length - 1]);
+  if (allowGoal && goalBlocked) pts.push({ x: to.x, z: to.z }); // last step onto the chair
+  return pts;
+}
+
+function navGoalFor(a) {
+  const st = a.agent.status;
+  if (st === 'working') {
+    const seat = NAV.seats[a.agent.home];
+    if (seat) return { x: seat.x, z: seat.z, seat };
+  }
+  if (a.navGoal && !a.navGoal.seat && Math.random() < 0.6) return a.navGoal; // linger a while
+  for (let tries = 0; tries < 40; tries++) {
+    const i = Math.floor(Math.random() * NAV.w), j = Math.floor(Math.random() * NAV.h);
+    if (navFree(i, j)) return toWorld(i, j);
+  }
+  return a.navGoal || { x: 0, z: 0 };
+}
+
+(function () {
+  // Agents used to spawn on top of their desk: start on a free spot next to it.
+  const _createAgents = createAgents;
+  createAgents = function () {
+    _createAgents();
+    if (!NAV.grid) return;
+    agents.forEach((a) => {
+      const [i, j] = nearestFree(...toCell(a.group.position.x, a.group.position.z));
+      const p = toWorld(i, j);
+      a.group.position.x = p.x; a.group.position.z = p.z;
+      const s = agentStates[a.agent.id];
+      if (s) { s.targetX = p.x; s.targetZ = p.z; }
+      a.path = []; a.navGoal = null; a.seated = false;
+    });
+  };
+  const _updateBehavior = updateBehavior;
+  updateBehavior = function () {
+    _updateBehavior();
+    if (liveConfig.mode !== 'live' || !NAV.grid) return;
+    agents.forEach((a) => {
+      const goal = navGoalFor(a);
+      const same = a.navGoal && Math.hypot(goal.x - a.navGoal.x, goal.z - a.navGoal.z) < 0.01;
+      if (same && (a.path?.length || a.seated)) return;
+      if (!same) a.seated = false;
+      a.navGoal = goal;
+      a.path = findPath(a.group.position, goal, !!goal.seat);
+    });
+  };
+
+  const _animateAgents = animateAgents;
+  animateAgents = function (delta) {
+    if (liveConfig.mode === 'live' && NAV.grid) {
+      agents.forEach((a) => {
+        const s = agentStates[a.agent.id];
+        if (!s) return;
+        if (a.seated) { s.targetX = a.group.position.x; s.targetZ = a.group.position.z; return; }
+        if (a.path && a.path.length) {
+          const wp = a.path[0];
+          if (Math.hypot(wp.x - a.group.position.x, wp.z - a.group.position.z) < 0.42) a.path.shift();
+        }
+        const wp = a.path && a.path[0];
+        if (wp) { s.targetX = wp.x; s.targetZ = wp.z; }
+        else { s.targetX = a.group.position.x; s.targetZ = a.group.position.z; }
+        if ((!a.path || !a.path.length) && a.navGoal && a.navGoal.seat && !a.seated) {
+          // Arrived at the chair: slide onto it and face the desk.
+          const g = a.navGoal.seat;
+          a.group.position.x += (g.x - a.group.position.x) * 0.25;
+          a.group.position.z += (g.z - a.group.position.z) * 0.25;
+          if (Math.hypot(g.x - a.group.position.x, g.z - a.group.position.z) < 0.03) a.seated = true;
+        }
+      });
+    }
+    _animateAgents(delta);
+    agents.forEach((a) => {
+      const legs = [[a.leftLeg, a.leftLowerLeg], [a.rightLeg, a.rightLowerLeg]];
+      if (!a.seated || !a.navGoal || !a.navGoal.seat) {
+        if (a.sitPose) { // stand up: lower legs and shoes back where createAgents put them
+          legs.forEach(([, low]) => { low.position.set(0, -0.38, 0); });
+          legs.forEach(([leg]) => { leg.children[2] && leg.children[2].position.set(0, -0.52, 0.04); leg.children[2] && (leg.children[2].rotation.x = 0); });
+          a.sitPose = false;
+        }
+        return;
+      }
+      const g = a.navGoal.seat;
+      a.group.position.set(g.x, 0.11, g.z);
+      a.sitPose = true;
+      let d = g.face - a.group.rotation.y;
+      while (d > Math.PI) d -= Math.PI * 2;
+      while (d < -Math.PI) d += Math.PI * 2;
+      a.group.rotation.y += d * 0.2;
+      // Thighs forward on the seat (leg group rotated -90°: its local -z is world down),
+      // shin hanging from the knee, shoe at its end.
+      legs.forEach(([leg, low]) => {
+        leg.rotation.x = -Math.PI / 2;
+        low.rotation.x = Math.PI / 2;
+        low.position.set(0, -0.30, -0.12);
+        const shoe = leg.children[2];
+        if (shoe) { shoe.position.set(0, -0.36, -0.27); shoe.rotation.x = Math.PI / 2; }
+      });
+      a.label.position.set(a.group.position.x, a.group.position.y + 2.1, a.group.position.z);
+    });
+  };
+})();
+
+
+/* --- Enfocar a un agente desde los iconos de arriba (añadido) --- */
+let focusId = null;
+const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
+let camReady = false;
+updateCamera = function () {
+  let pos, look;
+  const f = focusId && agents.find((a) => a.agent.id === focusId);
+  if (f) {
+    // Closer view of the agent, keeping the current rotation of the scene.
+    const p = f.group.position, d = 11 * zoom, h = 8 * zoom;
+    // With the card open on the right, aim to the right of the agent so it sits left of centre.
+    const cardOpen = document.getElementById('detail-panel').classList.contains('open');
+    const k = cardOpen ? 3.2 * zoom : 0, rx = Math.cos(currentRotation) * k, rz = -Math.sin(currentRotation) * k;
+    look = new THREE.Vector3(p.x + rx, 1.1, p.z + rz);
+    pos = new THREE.Vector3(p.x + rx + Math.sin(currentRotation) * d, h, p.z + rz + Math.cos(currentRotation) * d);
+  } else {
+    look = new THREE.Vector3(0, 0, 0);
+    pos = new THREE.Vector3(Math.sin(currentRotation) * 48 * zoom, 40 * zoom, Math.cos(currentRotation) * 48 * zoom);
+  }
+  if (!camReady) { camPos.copy(pos); camLook.copy(look); camReady = true; }
+  camPos.lerp(pos, 0.06);
+  camLook.lerp(look, 0.06);
+  camera.position.copy(camPos);
+  camera.lookAt(camLook);
+};
+(function () {
+  const _select = selectAgent, _close = closeDetail;
+  const bar = document.getElementById('focusBar');
+  function setFocus(id) {
+    focusId = id;
+    const a = id && AGENTS.find((x) => x.id === id);
+    bar.classList.toggle('on', !!a);
+    if (a) document.getElementById('focusName').textContent = `${a.emoji} Siguiendo a ${a.name}`;
+    document.querySelectorAll('.user-avatar').forEach((el) => el.classList.toggle('active', el.dataset.agent === id));
+  }
+  const unfocusAgent = window.unfocusAgent = function () { _close(); setFocus(null); };
+  selectAgent = function (id) { _select(id); if (AGENTS.some((a) => a.id === id)) setFocus(id); };
+  // Closing the card keeps following the agent.
+  closeDetail = function () { _close(); if (focusId) setFocus(focusId); };
+  // Second click on the same icon: back to the whole office.
+  document.getElementById('userBar').addEventListener('click', (e) => {
+    const av = e.target.closest('.user-avatar');
+    if (av && focusId && av.dataset.agent === focusId) { e.stopImmediatePropagation(); unfocusAgent(); }
+  }, true);
+  document.getElementById('focusExit').addEventListener('click', () => unfocusAgent());
+  document.getElementById('focusInfo').addEventListener('click', () => {
+    const open = document.getElementById('detail-panel').classList.contains('open');
+    if (open) closeDetail(); else if (focusId) _select(focusId);
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && focusId) unfocusAgent(); });
+  // The office icon in the left bar also goes back to the general view.
+  document.querySelector('.sidebar-icon[data-view="office"]').addEventListener('click', () => { if (focusId) unfocusAgent(); });
+})();
+
 init();
+
+/* --- Funciones de los botones (datos: /data.json, lo escribe virtoffice-feeder) --- */
+(function () {
+  let DATA = null, view = null;
+  const $ = (q) => document.querySelector(q);
+  const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const ST = { working: ['Trabajando', 'ok'], idle: ['Libre', 'muted'], offline: ['Desconectado', 'bad'], meeting: ['Reunión', 'warn'], walking: ['Paseando', 'muted'] };
+  const st = (s) => { const [t, c] = ST[s] || [s, 'muted']; return `<span class="pill ${c}">${esc(t)}</span>`; };
+  const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
+  const bar = (p) => `<div class="bar"><i style="width:${Math.min(p, 100)}%;background:${p > 90 ? '#f87171' : p > 70 ? '#fbbf24' : '#8B5CF6'}"></i></div>`;
+  const head = (t) => `<h3>${t}<button class="x" data-close>✕</button></h3>`;
+  const when = (iso) => { if (!iso) return '—'; const d = new Date(iso); return isNaN(d) ? esc(iso) : d.toLocaleString('es-ES', { weekday: 'short', hour: '2-digit', minute: '2-digit' }); };
+
+  const views = {
+    team() {
+      const a = DATA?.agents || [];
+      return head('👥 Equipo') + a.map((x) => `<div class="row"><span>${esc(x.emoji)} <b>${esc(x.name)}</b><br><span class="muted">${esc(x.role)}</span></span><span>${st(x.status)}<br><span class="muted">${esc(x.task)}</span></span></div>`).join('')
+        + `<p class="muted">Actualizado ${esc(DATA?.updated || '—')}</p>`;
+    },
+    tasks() {
+      const h = DATA?.hermes || {}, a = DATA?.agents || [];
+      let html = head('📋 Tareas') + '<h4>Ahora mismo</h4>' + a.map((x) => `<div class="row"><span>${esc(x.emoji)} ${esc(x.name)}</span><span>${esc(x.task)}</span></div>`).join('');
+      const k = h.kanban || [];
+      html += '<h4>Kanban de Hermes</h4>' + (k.length ? k.map((t) => `<div class="row"><span>${esc(t.title)}</span><span class="pill">${esc(t.status)}</span></div>`).join('') : '<p class="muted">Sin tareas abiertas.</p>');
+      const c = h.cron || [];
+      html += '<h4>Tareas programadas (Hermes)</h4>' + (c.length ? c.map((j) => `<div class="row"><span>${esc(j.name)}<br><span class="muted">${esc(j.schedule || '')}</span></span><span>${j.enabled === false ? '<span class="pill warn">pausada</span>' : `<span class="pill ${j.last_status === 'ok' ? 'ok' : j.last_status ? 'bad' : ''}">${esc(j.last_status || '—')}</span>`}<br><span class="muted">próx. ${when(j.next_run_at)}</span></span></div>`).join('') : '<p class="muted">Ninguna.</p>');
+      if (h.source === 'fallback') html += '<p class="muted">Leído de los ficheros de Hermes.</p>';
+      return html;
+    },
+    metrics() {
+      const m = DATA?.metrics || {};
+      const cs = m.containers || [], up = cs.filter((c) => c.state === 'running').length;
+      const unhealthy = cs.filter((c) => /unhealthy/.test(c.status));
+      return head('📊 Servidor')
+        + `<div class="row"><span>Carga (1/5/15 min)</span><span>${(m.load || []).join(' / ')} <span class="muted">· ${m.cpus || '?'} hilos</span></span></div>`
+        + `<div>Memoria <span class="muted">${m.mem_used_mb} / ${m.mem_total_mb} MB</span>${bar(pct(m.mem_used_mb, m.mem_total_mb))}</div>`
+        + `<div style="margin-top:8px">Swap <span class="muted">${m.swap_used_mb} / ${m.swap_total_mb} MB</span>${bar(pct(m.swap_used_mb, m.swap_total_mb))}</div>`
+        + `<div style="margin-top:8px">Disco <span class="muted">${m.disk_used_gb} / ${m.disk_total_gb} GB</span>${bar(pct(m.disk_used_gb, m.disk_total_gb))}</div>`
+        + `<div class="row"><span>Encendido</span><span>${m.uptime_h} h</span></div>`
+        + `<h4>Contenedores · ${up}/${cs.length} en marcha${unhealthy.length ? ` · <span class="bad">${unhealthy.length} con fallos</span>` : ''}</h4>`
+        + cs.map((c) => `<div class="row"><span>${esc(c.name)}</span><span class="${c.state === 'running' ? (/unhealthy/.test(c.status) ? 'bad' : 'ok') : 'muted'}">${esc(c.status)}</span></div>`).join('');
+    },
+    activity() {
+      const e = DATA?.events || [];
+      return head('💬 Actividad') + (e.length ? e.map((x) => `<div class="row"><span><span class="muted">${esc(x.t)}</span> <b>${esc(x.who)}</b></span><span>${st(x.status)} ${esc(x.task)}</span></div>`).join('') : '<p class="muted">Sin cambios desde que arrancó el panel.</p>');
+    },
+    settings() {
+      const chk = (id, on, txt) => `<label class="opt">${txt}<input type="checkbox" id="${id}" ${on ? 'checked' : ''}></label>`;
+      return head('⚙️ Ajustes')
+        + chk('optLabels', labelsVisible, 'Nombres sobre los personajes')
+        + chk('optRotate', autoRotate, 'Rotación automática de la cámara')
+        + chk('optBubbles', window.__bubblesOn !== false, 'Bocadillos con la tarea')
+        + `<label class="opt">Zoom<input type="range" id="optZoom" min="0.5" max="2.2" step="0.05" value="${zoom}"></label>`
+        + '<p class="muted">Los cambios solo afectan a este navegador.</p>';
+    },
+  };
+
+  function render() {
+    const p = $('#vpanel');
+    if (!view) { p.classList.remove('open'); return; }
+    // Do not re-render settings while the user is using its controls.
+    if (view === 'settings' && p.classList.contains('open') && p.dataset.view === 'settings') return;
+    p.innerHTML = views[view]();
+    p.dataset.view = view;
+    p.classList.add('open');
+  }
+  function open(v) {
+    view = view === v ? null : v;
+    document.querySelectorAll('.sidebar-icon').forEach((i) => i.classList.toggle('active', i.dataset.view === (view || 'office')));
+    $('#vpanel').dataset.view = '';
+    render();
+  }
+
+  document.querySelectorAll('.sidebar-icon').forEach((i) => i.addEventListener('click', () => {
+    const v = i.dataset.view;
+    if (v === 'office') return open(null);
+    if (v === 'lock') { $('#lockscreen').classList.add('on'); return; }
+    open(v);
+  }));
+  document.querySelectorAll('[data-open]').forEach((i) => { i.style.cursor = 'pointer'; i.addEventListener('click', () => open(i.dataset.open)); });
+  $('.standup-btn').addEventListener('click', () => open('team'));
+  $('.chat-btn').addEventListener('click', () => open('activity'));
+  $('#unlockBtn').addEventListener('click', () => $('#lockscreen').classList.remove('on'));
+  $('#vpanel').addEventListener('click', (e) => { if (e.target.closest('[data-close]')) open(null); });
+  $('#vpanel').addEventListener('input', (e) => {
+    const t = e.target;
+    if (t.id === 'optLabels' && t.checked !== labelsVisible) document.getElementById('labelsBtn').click();
+    if (t.id === 'optRotate' && t.checked !== autoRotate) document.getElementById('rotateBtn').click();
+    if (t.id === 'optBubbles') window.__bubblesOn = t.checked;
+    if (t.id === 'optZoom') { zoom = parseFloat(t.value); updateCamera(); }
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { open(null); $('#lockscreen').classList.remove('on'); } });
+
+  // Bocadillos desactivables desde Ajustes.
+  const _show = showChatBubble;
+  showChatBubble = function (a, t) { if (window.__bubblesOn === false) return; return _show(a, t); };
+
+  async function poll() {
+    try {
+      const r = await fetch('/data.json', { cache: 'no-store' });
+      if (r.ok) DATA = await r.json();
+      const a = DATA?.agents || [];
+      const busy = a.filter((x) => x.status === 'working').length;
+      $('.notif-title').innerHTML = `<span class="notif-pulse"></span> ${busy ? `${busy} ${busy === 1 ? 'agente trabajando' : 'agentes trabajando'}` : 'Todos libres'}`;
+      $('#meetingSub').textContent = a.map((x) => `${x.name}: ${(ST[x.status] || [x.status])[0]}`).join(' · ');
+      if (view && view !== 'settings') render();
+    } catch (e) {}
+  }
+  poll(); setInterval(poll, 5000);
+})();
 </script>
 </body>
 </html>

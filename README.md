@@ -1,3 +1,23 @@
+# Oficina de agentes 3D
+
+Fork de [OneByJorah/offivo](https://github.com/OneByJorah/offivo) (licencia MIT) adaptado para ver en una oficina 3D a **Hermes** y **Claude**, los agentes del servidor, con su estado real.
+
+## Qué cambia respecto al original
+
+- **Agentes reales:** el servicio `feeder` escribe en el panel el estado de Hermes (`~/.hermes/virtoffice/status.json`, su kanban y su cron) y de Claude (procesos `claude -p` en el contenedor `claude-discord`). Ya no salen los agentes de demostración ni frases o estados inventados.
+- **Movimiento:** los personajes calculan rutas (A*) que esquivan los muebles; cuando trabajan van a su puesto y se sientan frente al monitor; libres, pasean.
+- **Botones con función:** 📋 Tareas, 📊 Servidor (carga, memoria, swap, disco, contenedores), ⚙️ Ajustes, 🔒 Bloquear, Equipo y Actividad.
+- **Enfocar a un agente:** clic en su icono de arriba; la cámara le sigue. «Vista general», Esc o un segundo clic vuelven a la oficina completa.
+
+## Despliegue
+
+Stack de Portainer (método *Repository*) con `docker-compose.yml`:
+
+- `office`: el panel, en `http://<servidor>:9502` (variable `LAN_PORT`) y, por Cloudflare Tunnel, en `http://virtoffice:9502`. Sin login propio: ponle Cloudflare Access delante si lo publicas.
+- `feeder`: necesita el socket de Docker y `HERMES_HOME` (por defecto `/home/haz/.hermes`) en solo lectura.
+
+---
+
 <div align="center">
 
 ![Offivo banner](docs/assets/banner.svg)

@@ -1,3 +1,4 @@
+# Oficina de agentes 3D — panel 3D con el estado real de Hermes y Claude.
 services:
   office:
     build: .
@@ -8,8 +9,27 @@ services:
       HERMES_AGENT_API: ${HERMES_AGENT_API:-}
       POLL_INTERVAL_SECONDS: "5"
       ENABLE_SSE: "true"
+    # Red local / Tailscale. Por Cloudflare Tunnel: http://virtoffice:9502 (con Cloudflare Access delante).
+    ports:
+      - "${LAN_PORT:-9502}:9502"
     networks: [shared]
     restart: unless-stopped
+
+  # Escribe agents.json y data.json en el contenedor del panel cada 5-10 s.
+  feeder:
+    build: ./feeder
+    container_name: virtoffice-feeder
+    environment:
+      OFFICE_CONTAINER: virtoffice
+      CLAUDE_CONTAINER: ${CLAUDE_CONTAINER:-claude-discord}
+    volumes:
+      # Lee el estado de los contenedores y escribe en el del panel.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Estado de Hermes (status.json, kanban, cron), solo lectura.
+      - ${HERMES_HOME:-/home/haz/.hermes}:/hermes:ro
+    depends_on: [office]
+    restart: unless-stopped
+
 networks:
   shared:
     name: automation-stack_app-network
