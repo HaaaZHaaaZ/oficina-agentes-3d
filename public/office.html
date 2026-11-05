@@ -1060,8 +1060,9 @@ function createServerRoom() {
   const p1 = new THREE.Mesh(new THREE.BoxGeometry(0.08, 2.4, 6), glassMat);
   p1.position.set(roomX + 2.6, 1.2, roomZ);
   scene.add(p1);
-  const p2 = new THREE.Mesh(new THREE.BoxGeometry(4.8, 2.4, 0.08), glassMat);
-  p2.position.set(roomX, 1.2, roomZ + 2.8);
+  // Front glass wall, with a door next to the side wall.
+  const p2 = new THREE.Mesh(new THREE.BoxGeometry(2.6, 2.4, 0.08), glassMat);
+  p2.position.set(roomX - 1.1, 1.2, roomZ + 2.8);
   scene.add(p2);
   
   // Server racks
@@ -1111,7 +1112,7 @@ function createMeetingArea() {
   
   // Whiteboard with content
   const board = new THREE.Mesh(new THREE.BoxGeometry(3.5, 1.6, 0.08), new THREE.MeshStandardMaterial({ color: 0xf8f8f8 }));
-  board.position.set(-5, 1.7, -ROOM_DEPTH/2 + 0.25);
+  board.position.set(-2.6, 1.7, -ROOM_DEPTH/2 + 0.25);
   scene.add(board);
   
   const canvas = document.createElement('canvas');
@@ -1135,7 +1136,7 @@ function createMeetingArea() {
   ctx.fillText('↗ 24% MOM', 30, 70);
   const tex = new THREE.CanvasTexture(canvas);
   const boardContent = new THREE.Mesh(new THREE.PlaneGeometry(3.3, 1.45), new THREE.MeshBasicMaterial({ map: tex }));
-  boardContent.position.set(-5, 1.7, -ROOM_DEPTH/2 + 0.3);
+  boardContent.position.set(-2.6, 1.7, -ROOM_DEPTH/2 + 0.3);
   scene.add(boardContent);
 }
 
@@ -1166,8 +1167,8 @@ function createChair(x, z, rotation, color) {
 function createWorkstations() {
   const positions = [
     { x: -10.5, z: -2.5, name: 'analyst', angle: Math.PI/2 },
-    { x: -4, z: 0, name: 'writer', angle: Math.PI },
-    { x: 5, z: -1, name: 'marketer', angle: Math.PI },
+    { x: -4, z: 1.5, name: 'writer', angle: Math.PI },
+    { x: 7, z: -0.5, name: 'marketer', angle: Math.PI },
     { x: 10.5, z: 2, name: 'coder', angle: -Math.PI/2 },
     { x: -2, z: 7, name: 'open1', angle: 0 },
     { x: 3, z: 6, name: 'open2', angle: 0 },
@@ -1631,8 +1632,8 @@ function getHomePosition(home) {
   switch(home) {
     case 'meeting': return { x: 0, z: -ROOM_DEPTH/2 + 6.5 };
     case 'left': return { x: -10.5, z: -2.5 };
-    case 'center': return { x: -4, z: 0 };
-    case 'right': return { x: 5, z: -1 };
+    case 'center': return { x: -4, z: 1.5 };
+    case 'right': return { x: 7, z: -0.5 };
     case 'right2': return { x: 10.5, z: 2 };
     default: return { x: 0, z: 0 };
   }
@@ -2162,9 +2163,116 @@ const NAV = { cell: 0.35, w: 0, h: 0, grid: null, chairs: [], seats: {} };
   createFurniture = function () {
     const before = new Set(scene.children);
     _createFurniture();
+    createZones();
     buildNavGrid(scene.children.filter((c) => !before.has(c)));
+    buildSpots();
   };
 })();
+
+
+/* --- Áreas de la oficina: paredes, rótulos y sitios de trabajo (añadido) --- */
+const AREAS = {
+  desk:     { name: 'Puesto propio',     color: '#94a3b8' },
+  project:  { name: 'Proyectos',         color: '#10B981' },
+  server:   { name: 'Servidores',        color: '#3B82F6' },
+  research: { name: 'Biblioteca',        color: '#F59E0B' },
+  meeting:  { name: 'Sala de reuniones', color: '#8B5CF6' },
+  phone:    { name: 'Cabinas',           color: '#EF4444' },
+  rest:     { name: 'Descanso',          color: '#EC4899' },
+};
+const SPOTS = {};
+const WALLS = [];  // [x1, z1, x2, z2] of every glass wall segment
+
+function createZones() {
+  const glass = new THREE.MeshStandardMaterial({ color: 0x9fb4d8, transparent: true, opacity: 0.18, roughness: 0.1, metalness: 0.4 });
+  const frame = new THREE.MeshStandardMaterial({ color: 0x3a3f55 });
+  const H = 2.2;
+  // Wall from (x1,z1) to (x2,z2), axis-aligned; doors are just gaps between segments.
+  function wall(x1, z1, x2, z2) {
+    WALLS.push([x1, z1, x2, z2]);
+    const len = Math.hypot(x2 - x1, z2 - z1), horiz = Math.abs(z2 - z1) < 1e-6;
+    const g = new THREE.Group();
+    const pane = new THREE.Mesh(new THREE.BoxGeometry(horiz ? len : 0.08, H, horiz ? 0.08 : len), glass);
+    pane.position.y = H / 2;
+    const top = new THREE.Mesh(new THREE.BoxGeometry(horiz ? len : 0.12, 0.08, horiz ? 0.12 : len), frame);
+    top.position.y = H;
+    const base = new THREE.Mesh(new THREE.BoxGeometry(horiz ? len : 0.12, 0.12, horiz ? 0.12 : len), frame);
+    base.position.y = 0.06;
+    g.add(pane, top, base);
+    g.position.set((x1 + x2) / 2, 0, (z1 + z2) / 2);
+    scene.add(g);
+  }
+  function floorLabel(text, x, z, color, rot = 0) {
+    const c = document.createElement('canvas'); c.width = 512; c.height = 96;
+    const ctx = c.getContext('2d');
+    ctx.font = 'bold 54px Inter, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = color; ctx.globalAlpha = 0.85; ctx.fillText(text.toUpperCase(), 256, 50);
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(4, 0.75), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false }));
+    m.rotation.x = -Math.PI / 2; m.rotation.z = rot; m.position.set(x, 0.03, z);
+    scene.add(m);
+  }
+  function tint(x1, z1, x2, z2, color) {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(Math.abs(x2 - x1), Math.abs(z2 - z1)),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.07, depthWrite: false }));
+    m.rotation.x = -Math.PI / 2; m.position.set((x1 + x2) / 2, 0.02, (z1 + z2) / 2);
+    scene.add(m);
+  }
+  const W = ROOM_WIDTH / 2, D = ROOM_DEPTH / 2;
+
+  // Sala de reuniones (fondo, centro): puerta en el frente.
+  wall(-5.2, -D, -5.2, -1.6); wall(5.2, -D, 5.2, -1.6);
+  wall(-5.2, -1.6, -0.9, -1.6); wall(0.9, -1.6, 5.2, -1.6);
+  tint(-5.2, -D, 5.2, -1.6, AREAS.meeting.color);
+  floorLabel(AREAS.meeting.name, 0, -2.3, AREAS.meeting.color);
+
+  // Servidores (fondo, izquierda): ya tiene paredes de cristal; rótulo y suelo.
+  tint(-W, -D, -11.9, -6.7, AREAS.server.color);
+  floorLabel(AREAS.server.name, -15.4, -7.2, AREAS.server.color);
+
+  // Biblioteca (izquierda, junto a la estantería): puerta en el lateral.
+  wall(-W, 1, -13.5, 1); wall(-13.5, 1, -13.5, 3.2); wall(-13.5, 5.0, -13.5, 7.2);
+  tint(-W, 1, -13.5, 7.2, AREAS.research.color);
+  floorLabel(AREAS.research.name, -16, 1.6, AREAS.research.color);
+
+  // Cocina (esquina delantera izquierda): puerta hacia la oficina.
+  wall(-W, 7.2, -15.6, 7.2); wall(-13.8, 7.2, -11.8, 7.2); wall(-11.8, 7.2, -11.8, D);
+  tint(-W, 7.2, -11.8, D, AREAS.rest.color);
+  floorLabel('Cocina', -15.5, 7.8, AREAS.rest.color);
+
+  // Áreas abiertas, solo rótulo en el suelo.
+  floorLabel('Puesto de Claude', -10.5, -0.2, '#D97757');
+  floorLabel('Puesto de Hermes', 7, 1.2, '#8B5CF6');
+  tint(-4.5, 4.2, 10, 9, AREAS.project.color);
+  floorLabel(AREAS.project.name, 3, 4.6, AREAS.project.color);
+  floorLabel(AREAS.rest.name, 9.5, 11.6, AREAS.rest.color);
+  floorLabel(AREAS.phone.name, 15.5, -5.2, AREAS.phone.color);
+}
+
+// Sitting spot on the chair closest to (x, z), facing (fx, fz).
+function chairSeat(x, z, fx, fz) {
+  let best = null, bd = 1e9;
+  NAV.chairs.forEach((c) => { const d = Math.hypot(c.x - x, c.z - z); if (d < bd) { bd = d; best = c; } });
+  return best && { x: best.x, z: best.z, face: Math.atan2(fx - best.x, fz - best.z), sit: true };
+}
+function buildSpots() {
+  const D = ROOM_DEPTH / 2, W = ROOM_WIDTH / 2;
+  const stand = (x, z, fx, fz) => ({ x, z, face: Math.atan2(fx - x, fz - z), sit: false });
+  SPOTS.desk = { claude: chairSeat(-8.9, -2.5, -10.5, -2.5), hermes: chairSeat(7, -2.1, 7, -0.5) };
+  // Project desks (open1..open3): chairs in front of each desk.
+  SPOTS.project = [chairSeat(-2, 8.6, -2, 7), chairSeat(3, 7.6, 3, 6), chairSeat(8, 9.1, 8, 7.5)];
+  // Meeting table: two chairs facing each other.
+  SPOTS.meeting = [chairSeat(3, -6.5, 0, -6.5), chairSeat(-3, -6.5, 0, -6.5)];
+  SPOTS.server = [stand(-15.2, -7.3, -15.2, -9), stand(-13.9, -7.3, -13.9, -9)];
+  SPOTS.research = [stand(-15.9, 3.4, -W, 3.4), stand(-15.9, 4.8, -W, 4.8)];
+  SPOTS.phone = [{ x: W - 3.5, z: -D + 10, face: 0, sit: false, enter: true }, { x: W - 3.5, z: -D + 14, face: 0, sit: false, enter: true }];
+  SPOTS.rest = [
+    { x: 8.6, z: 8.0, face: Math.atan2(6.7 - 8.6, 10.2 - 8.0), sit: true, sofa: true },
+    { x: 10.2, z: 8.0, face: Math.atan2(6.7 - 10.2, 10.2 - 8.0), sit: true, sofa: true },
+    stand(-16, 8.9, -16, 10), stand(-14.4, 8.9, -14.4, 10),            // cocina
+    stand(-4.4, 10.5, -2, 10.5), stand(0.4, 10.5, -2, 10.5),            // ping-pong
+    stand(-15.8, -4, -W, -4),                                           // agua
+  ];
+}
 
 function toCell(x, z) {
   return [Math.floor((x + ROOM_WIDTH / 2) / NAV.cell), Math.floor((z + ROOM_DEPTH / 2) / NAV.cell)];
@@ -2208,6 +2316,28 @@ function buildNavGrid(objects) {
   });
 }
 
+function crossesWall(a, b) {
+  return WALLS.some(([x1, z1, x2, z2]) => {
+    if (Math.abs(z2 - z1) < 1e-6) {
+      if ((a.z - z1) * (b.z - z1) >= 0) return false;
+      const x = a.x + (b.x - a.x) * (z1 - a.z) / (b.z - a.z);
+      return x > Math.min(x1, x2) && x < Math.max(x1, x2);
+    }
+    if ((a.x - x1) * (b.x - x1) >= 0) return false;
+    const z = a.z + (b.z - a.z) * (x1 - a.x) / (b.x - a.x);
+    return z > Math.min(z1, z2) && z < Math.max(z1, z2);
+  });
+}
+
+// Nearest free cell from which (x, z) can be reached in a straight line without crossing a wall.
+function nearestFreeTo(x, z) {
+  const [i, j] = toCell(x, z);
+  for (let r = 0; r < 30; r++)
+    for (let dj = -r; dj <= r; dj++) for (let di = -r; di <= r; di++)
+      if ((Math.abs(di) === r || Math.abs(dj) === r) && navFree(i + di, j + dj) && !crossesWall(toWorld(i + di, j + dj), { x, z })) return [i + di, j + dj];
+  return nearestFree(i, j);
+}
+
 function nearestFree(i, j) {
   if (navFree(i, j)) return [i, j];
   for (let r = 1; r < 30; r++)
@@ -2228,18 +2358,21 @@ function lineFree(a, b) {
 // A* over the grid, 8 directions without cutting corners, then straightened.
 function findPath(from, to, allowGoal) {
   if (!NAV.grid) return [to];
-  const [si, sj] = nearestFree(...toCell(from.x, from.z));
+  const [si, sj] = nearestFreeTo(from.x, from.z);
   let [gi, gj] = toCell(to.x, to.z);
   const goalBlocked = !navFree(gi, gj);
-  if (goalBlocked) [gi, gj] = nearestFree(gi, gj);
+  if (goalBlocked) [gi, gj] = nearestFreeTo(to.x, to.z);
   const W = NAV.w, start = sj * W + si, goal = gj * W + gi;
   const g = new Float32Array(W * NAV.h).fill(Infinity), came = new Int32Array(W * NAV.h).fill(-1);
+  const closed = new Uint8Array(W * NAV.h);
   const open = [[0, start]]; g[start] = 0;
   const hf = (n) => Math.hypot((n % W) - gi, Math.floor(n / W) - gj);
   let found = false, guard = 0;
-  while (open.length && guard++ < 20000) {
+  while (open.length && guard++ < 60000) {
     let bi = 0; for (let k = 1; k < open.length; k++) if (open[k][0] < open[bi][0]) bi = k;
     const [, n] = open.splice(bi, 1)[0];
+    if (closed[n]) continue;
+    closed[n] = 1;
     if (n === goal) { found = true; break; }
     const ni = n % W, nj = Math.floor(n / W);
     for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
@@ -2251,7 +2384,7 @@ function findPath(from, to, allowGoal) {
       if (cost < g[m]) { g[m] = cost; came[m] = n; open.push([cost + hf(m), m]); }
     }
   }
-  if (!found) return [toWorld(gi, gj)];
+  if (!found) return [];
   const cells = [];
   for (let n = goal; n !== -1; n = came[n]) cells.unshift(toWorld(n % W, Math.floor(n / W)));
   const pts = [];
@@ -2265,17 +2398,17 @@ function findPath(from, to, allowGoal) {
 }
 
 function navGoalFor(a) {
-  const st = a.agent.status;
-  if (st === 'working') {
-    const seat = NAV.seats[a.agent.home];
-    if (seat) return { x: seat.x, z: seat.z, seat };
-  }
-  if (a.navGoal && !a.navGoal.seat && Math.random() < 0.6) return a.navGoal; // linger a while
-  for (let tries = 0; tries < 40; tries++) {
-    const i = Math.floor(Math.random() * NAV.w), j = Math.floor(Math.random() * NAV.h);
-    if (navFree(i, j)) return toWorld(i, j);
-  }
-  return a.navGoal || { x: 0, z: 0 };
+  const ag = a.agent, area = ag.status === 'working' ? (ag.area || 'desk') : 'rest';
+  const idx = Math.max(0, AGENTS.findIndex((x) => x.id === ag.id));
+  // Keep the current spot while the area does not change (rest: change now and then).
+  if (a.navGoal && a.navArea === area && (area !== 'rest' || Math.random() < 0.85)) return a.navGoal;
+  a.navArea = area;
+  let spot;
+  if (area === 'desk') spot = SPOTS.desk[ag.id] || SPOTS.project[idx % 3];
+  else if (area === 'rest') spot = SPOTS.rest[Math.floor(Math.random() * SPOTS.rest.length)];
+  else spot = (SPOTS[area] || SPOTS.project)[idx % (SPOTS[area] || SPOTS.project).length];
+  if (!spot) return a.navGoal || { x: 0, z: 0 };
+  return { x: spot.x, z: spot.z, seat: spot.sit ? spot : null, stand: spot.sit ? null : spot, enter: !!spot.enter };
 }
 
 (function () {
@@ -2300,10 +2433,11 @@ function navGoalFor(a) {
     agents.forEach((a) => {
       const goal = navGoalFor(a);
       const same = a.navGoal && Math.hypot(goal.x - a.navGoal.x, goal.z - a.navGoal.z) < 0.01;
-      if (same && (a.path?.length || a.seated)) return;
+      if (same && (a.path?.length || a.seated || a.arrived)) return;
+      a.arrived = false;
       if (!same) a.seated = false;
       a.navGoal = goal;
-      a.path = findPath(a.group.position, goal, !!goal.seat);
+      a.path = findPath(a.group.position, goal, !!(goal.seat || goal.enter));
     });
   };
 
@@ -2321,7 +2455,8 @@ function navGoalFor(a) {
         const wp = a.path && a.path[0];
         if (wp) { s.targetX = wp.x; s.targetZ = wp.z; }
         else { s.targetX = a.group.position.x; s.targetZ = a.group.position.z; }
-        if ((!a.path || !a.path.length) && a.navGoal && a.navGoal.seat && !a.seated) {
+        if ((!a.path || !a.path.length) && a.navGoal && a.navGoal.seat && !a.seated
+            && Math.hypot(a.navGoal.seat.x - a.group.position.x, a.navGoal.seat.z - a.group.position.z) < 1.2) {
           // Arrived at the chair: slide onto it and face the desk.
           const g = a.navGoal.seat;
           a.group.position.x += (g.x - a.group.position.x) * 0.25;
@@ -2332,6 +2467,15 @@ function navGoalFor(a) {
     }
     _animateAgents(delta);
     agents.forEach((a) => {
+      const st = agentStates[a.agent.id];
+      if (st && liveConfig.mode === 'live') st.status = a.navArea === 'meeting' && a.seated ? 'meeting' : (a.agent.status || 'idle');
+      if (!a.seated && a.navGoal && a.navGoal.stand && (!a.path || !a.path.length)) {
+        a.arrived = true;
+        let d = a.navGoal.stand.face - a.group.rotation.y;
+        while (d > Math.PI) d -= Math.PI * 2;
+        while (d < -Math.PI) d += Math.PI * 2;
+        a.group.rotation.y += d * 0.15;
+      }
       const legs = [[a.leftLeg, a.leftLowerLeg], [a.rightLeg, a.rightLowerLeg]];
       if (!a.seated || !a.navGoal || !a.navGoal.seat) {
         if (a.sitPose) { // stand up: lower legs and shoes back where createAgents put them
@@ -2342,7 +2486,7 @@ function navGoalFor(a) {
         return;
       }
       const g = a.navGoal.seat;
-      a.group.position.set(g.x, 0.11, g.z);
+      a.group.position.set(g.x, g.sofa ? 0.02 : 0.11, g.z);
       a.sitPose = true;
       let d = g.face - a.group.rotation.y;
       while (d > Math.PI) d -= Math.PI * 2;
@@ -2434,7 +2578,7 @@ init();
   const views = {
     team() {
       const a = DATA?.agents || [];
-      return head('👥 Equipo') + a.map((x) => `<div class="row"><span>${esc(x.emoji)} <b>${esc(x.name)}</b><br><span class="muted">${esc(x.role)}</span></span><span>${st(x.status)}<br><span class="muted">${esc(x.task)}</span></span></div>`).join('')
+      return head('👥 Equipo') + a.map((x) => `<div class="row"><span>${esc(x.emoji)} <b>${esc(x.name)}</b><br><span class="muted">${esc(x.role)}</span></span><span>${st(x.status)} <span class="pill">📍 ${esc((AREAS[x.status === 'working' ? (x.area || 'desk') : 'rest'] || {}).name || '')}</span><br><span class="muted">${esc(x.task)}</span></span></div>`).join('')
         + `<p class="muted">Actualizado ${esc(DATA?.updated || '—')}</p>`;
     },
     tasks() {
@@ -2520,6 +2664,8 @@ init();
       const r = await fetch('/data.json', { cache: 'no-store' });
       if (r.ok) DATA = await r.json();
       const a = DATA?.agents || [];
+      // The server drops unknown fields from /api/agents: take area/project from data.json.
+      a.forEach((x) => { const ag = AGENTS.find((y) => y.id === x.id); if (ag) { ag.area = x.area; ag.project = x.project; } });
       const busy = a.filter((x) => x.status === 'working').length;
       $('.notif-title').innerHTML = `<span class="notif-pulse"></span> ${busy ? `${busy} ${busy === 1 ? 'agente trabajando' : 'agentes trabajando'}` : 'Todos libres'}`;
       $('#meetingSub').textContent = a.map((x) => `${x.name}: ${(ST[x.status] || [x.status])[0]}`).join(' · ');

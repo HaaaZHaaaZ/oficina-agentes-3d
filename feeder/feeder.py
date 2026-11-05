@@ -29,19 +29,44 @@ def docker(method, path, body=None, headers=None):
     return r.status, data
 
 
+# Where each kind of work happens in the office (see AREAS in office.html).
+AREA_WORDS = [
+    ("phone", ["esperando", "aprobaci", "confirmaci", "autoriz"]),
+    ("server", ["despleg", "deploy", "docker", "contenedor", "portainer", "servidor", "reinici", "stack",
+                "logs", "nginx", "cloudflare", "túnel", "tunel", "puerto", "backup", "postgres", "base de datos", "memoria ram"]),
+    ("research", ["busca", "investiga", "documenta", "compara", "analiza", "informe", "resumen", "lee ", "leer", "web"]),
+]
+
+
+def classify(text):
+    t = (text or "").lower()
+    for area, words in AREA_WORDS:
+        if any(w in t for w in words):
+            return area
+    return "desk"
+
+
 def claude_state():
     st, data = docker("GET", f"/containers/{CLAUDE}/top")
-    runs = []
+    runs, areas = [], []
     if st == 200:
         for args in [p[-1] for p in json.loads(data).get("Processes") or []]:
             if args.startswith("claude -p"):
                 m = re.search(r"hilo del proyecto «([^»]+)»", args)
                 runs.append(f"Proyecto «{m.group(1)}»" if m else "Canal #ubuntu-server")
+                request = args.split("te escribe:")[-1].split("--output-format")[0]
+                if m:
+                    areas.append(("project", m.group(1)))
+                elif "(Este mensaje es de Hermes" in args:
+                    areas.append(("meeting", None))
+                else:
+                    areas.append((classify(request), None))
     working = bool(runs)
     return {
         "id": "claude", "name": "Claude", "role": "Claude Code · servidor", "emoji": "🟠",
         "color": "#D97757", "home": "left",
         "status": "working" if working else "idle", "typing": working,
+        "area": areas[0][0] if areas else "rest", "project": areas[0][1] if areas else None,
         "task": " · ".join(runs) if working else "Esperando mención en Discord",
         "tasks": runs or ["Libre"], "output": [], "mood": 0.85,
         "stats": {"tasksDone": 0, "active": len(runs), "hours": 0},
@@ -69,6 +94,8 @@ def hermes_state():
     return {
         "id": "hermes", "name": "Hermes", "role": "Hermes Agent · GitHub/Portainer", "emoji": "☤",
         "color": "#8B5CF6", "home": "right", "status": status, "typing": status == "working",
+        "area": (("meeting" if "claude" in task.lower() else classify(task)) if status == "working" else "rest"),
+        "project": (re.search(r"[Pp]royecto «?([\w\- ]+)", task).group(1).strip() if status == "working" and re.search(r"[Pp]royecto «?([\w\- ]+)", task) else None),
         "task": task, "tasks": [task], "output": [], "mood": 0.85,
         "stats": {"tasksDone": 0, "active": 1 if work else 0, "hours": 0},
     }
@@ -157,6 +184,12 @@ last, prev, tick = None, None, 0
 while True:
     try:
         agents = [hermes_state(), claude_state()]
+        h, c = agents
+        if h["project"] and c["project"] and h["project"].lower() == c["project"].lower():
+            h["area"] = c["area"] = "meeting"
+        for a in agents:
+            if a["area"] != "rest" and a["project"] and a["area"] == "desk":
+                a["area"] = "project"
         key = json.dumps(agents, sort_keys=True)
         if key != last:
             note_changes(prev, agents)
