@@ -15,6 +15,13 @@ Stack de Portainer (método *Repository*) con `docker-compose.yml`:
 
 - `office`: el panel, en `http://<servidor>:9502` (variable `LAN_PORT`) y, por Cloudflare Tunnel, en `http://virtoffice:9502`. Sin login propio: ponle Cloudflare Access delante si lo publicas.
 - `feeder`: necesita el socket de Docker y `HERMES_HOME` (por defecto `/home/haz/.hermes`) en solo lectura.
+- **Tarea actual de Hermes:** el feeder lee `~/.hermes/virtoffice/current_task.txt` directamente (una línea; vacío = libre). `status.json` de `hermes/publish_status.py` es opcional: solo se usa si se ha escrito hace menos de 90 s; si no, el feeder lee el kanban y el cron de Hermes por su cuenta.
+
+### Migrar desde la prueba (contenedores sueltos)
+
+1. `docker rm -f virtoffice-lan virtoffice-feeder` (los de la etiqueta `temporal=virtoffice-test`; ocupan el puerto 9502 y el nombre del feeder).
+2. En Portainer, borrar el stack standalone y crearlo como *Repository*: este repo, rama `main`, `docker-compose.yml`.
+3. Comprobar `http://<servidor>:9502` y `docker logs virtoffice-feeder`.
 
 ---
 

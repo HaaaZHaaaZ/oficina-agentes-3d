@@ -73,6 +73,30 @@ def claude_state():
     }
 
 
+def hermes_status_file(max_age=90):
+    """/hermes/virtoffice/status.json from Hermes's publish_status.py, only if it is fresh
+    (the publisher stops when Hermes restarts; a stale file would show old work)."""
+    p = "/hermes/virtoffice/status.json"
+    try:
+        if time.time() - os.path.getmtime(p) < max_age:
+            return json.load(open(p))
+    except Exception:
+        pass
+    return None
+
+
+def hermes_current_task():
+    """What Hermes says it is doing: current_task.txt (read directly, no publisher needed)."""
+    try:
+        t = open("/hermes/virtoffice/current_task.txt").read().strip()
+        if t:
+            return t
+    except Exception:
+        pass
+    own = (hermes_status_file() or {}).get("current") or {}
+    return own.get("task")
+
+
 def hermes_state():
     try:
         d = json.load(open("/hermes/gateway_state.json"))
@@ -80,12 +104,9 @@ def hermes_state():
         d = {}
     work = d.get("active_work")
     running = d.get("gateway_state") == "running"
-    try:  # what Hermes itself says it is doing (/hermes/virtoffice/status.json), fresher than active_work
-        own = json.load(open("/hermes/virtoffice/status.json")).get("current")
-        if own and own.get("task"):
-            work = own["task"]
-    except Exception:
-        pass
+    own = hermes_current_task()  # fresher than active_work
+    if own and running:
+        work = own
     if work:
         task = work if isinstance(work, str) else json.dumps(work, ensure_ascii=False)[:80]
         status = "working"
@@ -113,12 +134,10 @@ def note_changes(prev, agents):
 
 
 def hermes_extra():
-    """Hermes publishes /hermes/virtoffice/status.json (tasks, cron, current work). Until then,
-    read its kanban and cron files directly."""
-    try:
-        return json.load(open("/hermes/virtoffice/status.json"))
-    except Exception:
-        pass
+    """Fresh status.json from Hermes if there is one; otherwise read its kanban and cron files directly."""
+    fresh = hermes_status_file()
+    if fresh:
+        return fresh
     out = {"source": "fallback", "kanban": [], "cron": []}
     try:
         import sqlite3
