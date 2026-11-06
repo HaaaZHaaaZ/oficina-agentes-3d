@@ -13,7 +13,7 @@ body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   color: #fff;
 }
-#canvas-container { 
+#canvas-container { touch-action: none; 
   width: 100vw; 
   height: 100vh; 
   position: fixed;
@@ -499,6 +499,8 @@ body {
 #vpanel .x { background: none; border: 0; color: #9a9ab0; font-size: 18px; cursor: pointer; }
 #vpanel .row { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,.06); }
 #vpanel .row span:last-child { color: #b8b8cc; text-align: right; }
+#vpanel .row.task { flex-direction: column; gap: 4px; }
+#vpanel .row.task span:last-child { text-align: left; color: #d8d8e8; }
 #vpanel .pill { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 11.5px; background: rgba(255,255,255,.08); }
 #vpanel .ok { color: #34d399 } #vpanel .warn { color: #fbbf24 } #vpanel .bad { color: #f87171 }
 #vpanel .bar { height: 7px; border-radius: 99px; background: rgba(255,255,255,.08); overflow: hidden; margin-top: 4px; }
@@ -518,19 +520,37 @@ body {
   background: rgba(18,18,30,0.9); color: #e8e8f0; border: 1px solid rgba(255,255,255,0.12); border-radius: 99px; padding: 6px 8px 6px 14px; font-size: 13px; }
 #focusBar.on { display: flex; }
 #focusBar button { border: 0; border-radius: 99px; padding: 6px 12px; cursor: pointer; background: rgba(255,255,255,0.1); color: #fff; font-size: 13px; }
+
+/* Móvil: sin solapes entre cabecera, avisos y barra inferior */
+@media (max-width: 760px) {
+  .title, .notification, .right-sidebar { display: none !important; }
+  .header { padding-top: 12px; }
+  .standup-btn { top: auto; bottom: 64px; right: auto; left: 12px; padding: 10px 14px; }
+  .chat-btn { bottom: 64px; right: 12px; padding: 10px 14px; }
+  .status-footer { padding: 10px 8px; gap: 12px; flex-wrap: wrap; }
+  .status-item { font-size: 9px; letter-spacing: 0.04em; }
+  .left-sidebar { left: 10px; }
+  .sidebar-icon { width: 40px; height: 40px; font-size: 17px; }
+  .controls { right: 10px !important; bottom: 112px; }
+  #vpanel { left: 58px; width: calc(100vw - 68px); z-index: 120; }
+  /* Ficha del agente abajo, para seguir viendo al agente enfocado */
+  #detail-panel { top: auto; bottom: 52px; left: 8px !important; right: 8px; min-width: 0; max-width: none; padding: 16px;
+    max-height: 46vh; transform: translateY(16px) !important; }
+  #detail-panel.open { transform: none !important; }
+}
 </style>
 </head>
 <body>
 <div id="loading">
   <div class="spinner"></div>
-  <div class="loading-text">Assembling Office</div>
+  <div class="loading-text">Montando la oficina</div>
 </div>
 
 <div id="canvas-container"></div>
 
 <div id="ui">
   <div class="header">
-    <div class="title">Hermes Headquarters</div>
+    <div class="title">Oficina de agentes</div>
     <div class="user-bar" id="userBar"></div>
   </div>
 
@@ -558,10 +578,10 @@ body {
   <button class="chat-btn" title="Actividad reciente">Actividad</button>
 
   <div class="controls">
-    <button class="ctrl-btn" id="zoomIn">+</button>
-    <button class="ctrl-btn" id="zoomOut">−</button>
-    <button class="ctrl-btn" id="rotateBtn">↻</button>
-    <button class="ctrl-btn active" id="labelsBtn" title="Toggle labels">🏷</button>
+    <button class="ctrl-btn" id="zoomIn" title="Acercar">+</button>
+    <button class="ctrl-btn" id="zoomOut" title="Alejar">−</button>
+    <button class="ctrl-btn" id="rotateBtn" title="Girar sola">↻</button><button class="ctrl-btn" id="camReset" title="Volver a la vista inicial">⌂</button>
+    <button class="ctrl-btn active" id="labelsBtn" title="Nombres">🏷</button>
   </div>
 
   <div id="focusBar"><span id="focusName"></span><button id="focusInfo">Ficha</button><button id="focusExit">🏢 Vista general</button></div>
@@ -587,25 +607,25 @@ body {
     <div class="detail-grid">
       <div class="detail-stat">
         <div class="detail-stat-value" id="statTasks">12</div>
-        <div class="detail-stat-label">Tasks Done</div>
+        <div class="detail-stat-label">Hechas hoy</div>
       </div>
       <div class="detail-stat">
         <div class="detail-stat-value" id="statActive">3</div>
-        <div class="detail-stat-label">Active</div>
+        <div class="detail-stat-label">En curso</div>
       </div>
       <div class="detail-stat">
         <div class="detail-stat-value" id="statHours">4.2h</div>
-        <div class="detail-stat-label">Today</div>
+        <div class="detail-stat-label">Horas hoy</div>
       </div>
     </div>
     
     <div class="detail-section">
-      <div class="detail-section-title">Current Tasks</div>
+      <div class="detail-section-title">Encargo actual</div>
       <div class="detail-task-list" id="detailTasks"></div>
     </div>
     
     <div class="detail-section">
-      <div class="detail-section-title">Recent Output</div>
+      <div class="detail-section-title">Últimos encargos terminados</div>
       <div class="detail-task-list" id="detailOutput"></div>
     </div>
   </div>
@@ -700,7 +720,7 @@ function applyLiveAgents(newAgents) {
     liveIds = ids;
     createAgents();
     setupUI();
-    showToast('Live agents synced');
+    showToast('Agentes en vivo conectados');
   }
   updateStatusBar();
   if (selectedAgent) selectAgent(selectedAgent.id);
@@ -772,8 +792,6 @@ function init() {
     updateStatusBar();
     
     // Controls
-    document.getElementById('zoomIn').addEventListener('click', () => { zoom = Math.max(0.5, zoom - 0.12); updateCamera(); });
-    document.getElementById('zoomOut').addEventListener('click', () => { zoom = Math.min(2.2, zoom + 0.12); updateCamera(); });
     document.getElementById('rotateBtn').addEventListener('click', () => { 
       autoRotate = !autoRotate; 
       document.getElementById('rotateBtn').classList.toggle('active', autoRotate);
@@ -796,7 +814,6 @@ function init() {
       icon.addEventListener('click', () => {
         document.querySelectorAll('.sidebar-icon').forEach(i => i.classList.remove('active'));
         icon.classList.add('active');
-        showToast(`Switched to ${icon.dataset.view} view`);
       });
     });
     
@@ -809,7 +826,7 @@ function init() {
     animate();
   } catch (err) {
     console.error('Office init error:', err);
-    showToast('Office loaded with fallback mode');
+    showToast('Oficina cargada en modo reducido');
   } finally {
     setTimeout(hideLoading, 600);
     startLiveUpdates();
@@ -1302,7 +1319,7 @@ function createPhoneBooths() {
   const positions = [[ROOM_WIDTH/2 - 3.5, -ROOM_DEPTH/2 + 10], [ROOM_WIDTH/2 - 3.5, -ROOM_DEPTH/2 + 14]];
   positions.forEach(([x, z]) => {
     const booth = new THREE.Mesh(new THREE.BoxGeometry(1.6, 2.6, 1.6), new THREE.MeshStandardMaterial({ 
-      color: 0xff6b6b, transparent: true, opacity: 0.85, roughness: 0.3 
+      color: 0xff6b6b, transparent: true, opacity: 0.4, roughness: 0.3, depthWrite: false 
     }));
     booth.position.set(x, 1.3, z);
     booth.castShadow = true;
@@ -1453,7 +1470,7 @@ function createDecor() {
 
 function createAgents() {
   // Clear old agents if re-initializing from live data
-  agents.forEach(a => scene.remove(a.group));
+  agents.forEach(a => { scene.remove(a.group); if (a.label) scene.remove(a.label); if (a.activeBubble) scene.remove(a.activeBubble.sprite); });
   labels.forEach(l => scene.remove(l));
   clickableObjects = clickableObjects.filter(o => !o.userData.agentId);
   agents = [];
@@ -1608,7 +1625,9 @@ function createAgents() {
     agentStates[agent.id].targetZ = startPos.z;
     
     const label = createLabel(agent.name, agent.color);
+    label.visible = labelsVisible;
     scene.add(label);
+    labels.push(label); // so they are removed when the agents are rebuilt and the 🏷 button hides them
     
     // Invisible click target
     const clickTarget = new THREE.Mesh(new THREE.BoxGeometry(0.7, 2.2, 0.7), new THREE.MeshBasicMaterial({ visible: false }));
@@ -1695,13 +1714,10 @@ function updateStatusBar() {
   };
   
   const items = [
-    { key: 'working', label: 'working', color: '#5ee2b5' },
-    { key: 'idle', label: 'idle', color: '#f5b544' },
-    { key: 'meeting', label: 'meeting', color: '#8B5CF6' },
-    { key: 'walking', label: 'walking', color: '#7DD3FC' },
-    { key: 'away', label: 'away', color: 'rgba(255,255,255,0.3)' },
-    { key: 'out', label: 'out', color: 'rgba(255,255,255,0.3)' },
-    { key: 'sick', label: 'sick', color: 'rgba(255,255,255,0.3)' }
+    { key: 'working', label: 'trabajando', color: '#5ee2b5' },
+    { key: 'idle', label: 'libres', color: '#f5b544' },
+    { key: 'meeting', label: 'en reunión', color: '#8B5CF6' },
+    { key: 'walking', label: 'caminando', color: '#7DD3FC' }
   ];
   
   footer.innerHTML = items.map(item => {
@@ -2252,7 +2268,18 @@ function createZones() {
 function chairSeat(x, z, fx, fz) {
   let best = null, bd = 1e9;
   NAV.chairs.forEach((c) => { const d = Math.hypot(c.x - x, c.z - z); if (d < bd) { bd = d; best = c; } });
-  return best && { x: best.x, z: best.z, face: Math.atan2(fx - best.x, fz - best.z), sit: true };
+  if (!best) return null;
+  const face = Math.atan2(fx - best.x, fz - best.z);
+  return { x: best.x, z: best.z, face, sit: true, approach: approachPoint(best.x, best.z, face + Math.PI) };
+}
+// Free point ~0.9 m from (x, z) in direction `dir` (or the closest free direction to it), reachable
+// in a straight line: where an agent stands before sitting down or after getting up.
+function approachPoint(x, z, dir) {
+  for (const r of [0.9, 1.1, 1.3]) for (const off of [0, 0.5, -0.5, 1, -1, 1.57, -1.57]) {
+    const p = { x: x + Math.sin(dir + off) * r, z: z + Math.cos(dir + off) * r };
+    if (navFree(...toCell(p.x, p.z)) && !crossesWall(p, { x, z })) return p;
+  }
+  return null;
 }
 function buildSpots() {
   const D = ROOM_DEPTH / 2, W = ROOM_WIDTH / 2;
@@ -2264,7 +2291,8 @@ function buildSpots() {
   SPOTS.meeting = [chairSeat(3, -6.5, 0, -6.5), chairSeat(-3, -6.5, 0, -6.5)];
   SPOTS.server = [stand(-15.2, -7.3, -15.2, -9), stand(-13.9, -7.3, -13.9, -9)];
   SPOTS.research = [stand(-15.9, 3.4, -W, 3.4), stand(-15.9, 4.8, -W, 4.8)];
-  SPOTS.phone = [{ x: W - 3.5, z: -D + 10, face: 0, sit: false, enter: true }, { x: W - 3.5, z: -D + 14, face: 0, sit: false, enter: true }];
+  // Phone booths: the glass door is on their +z side; walk up to it, then step inside.
+  SPOTS.phone = [-D + 10, -D + 14].map((z) => ({ x: W - 3.5, z, face: 0, sit: false, enter: true, approach: { x: W - 3.5, z: z + 1.45 } }));
   SPOTS.rest = [
     { x: 8.6, z: 8.0, face: Math.atan2(6.7 - 8.6, 10.2 - 8.0), sit: true, sofa: true },
     { x: 10.2, z: 8.0, face: Math.atan2(6.7 - 10.2, 10.2 - 8.0), sit: true, sofa: true },
@@ -2272,6 +2300,7 @@ function buildSpots() {
     stand(-4.4, 10.5, -2, 10.5), stand(0.4, 10.5, -2, 10.5),            // ping-pong
     stand(-15.8, -4, -W, -4),                                           // agua
   ];
+  SPOTS.rest.forEach((sp) => { if (sp.sofa) sp.approach = approachPoint(sp.x, sp.z, sp.face); });
 }
 
 function toCell(x, z) {
@@ -2408,7 +2437,7 @@ function navGoalFor(a) {
   else if (area === 'rest') spot = SPOTS.rest[Math.floor(Math.random() * SPOTS.rest.length)];
   else spot = (SPOTS[area] || SPOTS.project)[idx % (SPOTS[area] || SPOTS.project).length];
   if (!spot) return a.navGoal || { x: 0, z: 0 };
-  return { x: spot.x, z: spot.z, seat: spot.sit ? spot : null, stand: spot.sit ? null : spot, enter: !!spot.enter };
+  return { x: spot.x, z: spot.z, seat: spot.sit ? spot : null, stand: spot.sit ? null : spot, enter: !!spot.enter, approach: spot.approach || null };
 }
 
 (function () {
@@ -2435,9 +2464,17 @@ function navGoalFor(a) {
       const same = a.navGoal && Math.hypot(goal.x - a.navGoal.x, goal.z - a.navGoal.z) < 0.01;
       if (same && (a.path?.length || a.seated || a.arrived)) return;
       a.arrived = false;
+      // Getting up from a chair or leaving a booth: back out the way it came in.
+      const old = a.navGoal, pos = a.group.position;
+      const exit = !same && old && old.approach && Math.hypot(old.x - pos.x, old.z - pos.z) < 0.8 ? old.approach : null;
       if (!same) a.seated = false;
       a.navGoal = goal;
-      a.path = findPath(a.group.position, goal, !!(goal.seat || goal.enter));
+      const from = exit || pos;
+      if (goal.approach) {
+        a.path = findPath(from, goal.approach, false);
+        if (a.path.length) a.path.push({ x: goal.x, z: goal.z, soft: true }); // last step onto the chair / into the booth
+      } else a.path = findPath(from, goal, !!(goal.seat || goal.enter));
+      if (exit) a.path.unshift({ x: exit.x, z: exit.z, soft: true });
     });
   };
 
@@ -2465,7 +2502,26 @@ function navGoalFor(a) {
         }
       });
     }
+    const before = agents.map((a) => ({ x: a.group.position.x, z: a.group.position.z }));
     _animateAgents(delta);
+    if (liveConfig.mode === 'live' && NAV.grid) agents.forEach((a, k) => {
+      // Hard limits: never through a glass wall, never into furniture outside the last step to a seat,
+      // and do not walk into another agent (the later one waits a moment).
+      const p = a.group.position, b = before[k], soft = a.seated || (a.path && a.path[0] && a.path[0].soft)
+        || (a.navGoal && a.navGoal.seat && Math.hypot(a.navGoal.x - p.x, a.navGoal.z - p.z) < 1.2);
+      if (p.x === b.x && p.z === b.z) return;
+      let block = crossesWall(b, p);
+      if (!block && !soft && navFree(...toCell(b.x, b.z)) && !navFree(...toCell(p.x, p.z))) block = true;
+      if (!block && !soft) {
+        const other = agents.find((o, m) => m < k && Math.hypot(o.group.position.x - p.x, o.group.position.z - p.z) < 0.7);
+        if (other && Math.hypot(other.group.position.x - p.x, other.group.position.z - p.z) < Math.hypot(other.group.position.x - b.x, other.group.position.z - b.z)) {
+          a.waited = (a.waited || 0) + delta;
+          if (a.waited < 2) block = true;
+        } else a.waited = 0;
+      }
+      if (block) { p.x = b.x; p.z = b.z; a.blocked = (a.blocked || 0) + delta; } else a.blocked = 0;
+      if (a.blocked > 3) { a.blocked = 0; a.navGoal = null; a.path = []; } // stuck: plan again
+    });
     agents.forEach((a) => {
       const st = agentStates[a.agent.id];
       if (st && liveConfig.mode === 'live') st.status = a.navArea === 'meeting' && a.seated ? 'meeting' : (a.agent.status || 'idle');
@@ -2509,29 +2565,114 @@ function navGoalFor(a) {
 
 /* --- Enfocar a un agente desde los iconos de arriba (añadido) --- */
 let focusId = null;
-const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
-let camReady = false;
+// Free camera: orbits around CAM.target (yaw = currentRotation, CAM.pitch, distance from zoom).
+const BASE_PITCH = Math.atan2(40, 48), BASE_DIST = Math.hypot(40, 48);
+const CAM = { target: new THREE.Vector3(), look: new THREE.Vector3(), pitch: BASE_PITCH, dist: BASE_DIST, ready: false };
+function resetCamera() {
+  CAM.target.set(0, 0, 0); CAM.pitch = BASE_PITCH; zoom = 1; targetRotation = -Math.PI / 4;
+}
 updateCamera = function () {
-  let pos, look;
   const f = focusId && agents.find((a) => a.agent.id === focusId);
+  let look, dist;
   if (f) {
-    // Closer view of the agent, keeping the current rotation of the scene.
-    const p = f.group.position, d = 11 * zoom, h = 8 * zoom;
-    // With the card open on the right, aim to the right of the agent so it sits left of centre.
+    // Closer view of the agent; with the card open on the right, aim right of it so it sits left of centre.
+    const p = f.group.position;
     const cardOpen = document.getElementById('detail-panel').classList.contains('open');
-    const k = cardOpen ? 3.2 * zoom : 0, rx = Math.cos(currentRotation) * k, rz = -Math.sin(currentRotation) * k;
-    look = new THREE.Vector3(p.x + rx, 1.1, p.z + rz);
-    pos = new THREE.Vector3(p.x + rx + Math.sin(currentRotation) * d, h, p.z + rz + Math.cos(currentRotation) * d);
+    const k = cardOpen ? 3.2 * zoom : 0;
+    look = new THREE.Vector3(p.x + Math.cos(currentRotation) * k, 1.1, p.z - Math.sin(currentRotation) * k);
+    dist = 13.6 * zoom;
   } else {
-    look = new THREE.Vector3(0, 0, 0);
-    pos = new THREE.Vector3(Math.sin(currentRotation) * 48 * zoom, 40 * zoom, Math.cos(currentRotation) * 48 * zoom);
+    look = CAM.target;
+    dist = BASE_DIST * zoom;
   }
-  if (!camReady) { camPos.copy(pos); camLook.copy(look); camReady = true; }
-  camPos.lerp(pos, 0.06);
-  camLook.lerp(look, 0.06);
-  camera.position.copy(camPos);
-  camera.lookAt(camLook);
+  if (!CAM.ready) { CAM.look.copy(look); CAM.dist = dist; CAM.ready = true; }
+  CAM.look.lerp(look, f ? 0.06 : 0.25);
+  CAM.dist += (dist - CAM.dist) * 0.15;
+  const c = Math.cos(CAM.pitch) * CAM.dist;
+  camera.position.set(CAM.look.x + Math.sin(currentRotation) * c, CAM.look.y + Math.sin(CAM.pitch) * CAM.dist, CAM.look.z + Math.cos(currentRotation) * c);
+  camera.lookAt(CAM.look);
 };
+(function () {
+  const el = document.getElementById('canvas-container');
+  const W2 = ROOM_WIDTH / 2 + 4, D2 = ROOM_DEPTH / 2 + 4;
+  const clampZoom = (z) => Math.min(2.2, Math.max(0.12, z));
+  function pan(dx, dz) { // dx, dz in screen terms: right / forward, world units
+    if (focusId) { CAM.target.set(CAM.look.x, 0, CAM.look.z); window.unfocusAgent && window.unfocusAgent(true); }
+    const r = currentRotation;
+    CAM.target.x = Math.max(-W2, Math.min(W2, CAM.target.x + Math.cos(r) * dx - Math.sin(r) * dz));
+    CAM.target.z = Math.max(-D2, Math.min(D2, CAM.target.z - Math.sin(r) * dx - Math.cos(r) * dz));
+  }
+  function rotate(dx, dy) {
+    targetRotation -= dx * 0.006; currentRotation -= dx * 0.006;
+    CAM.pitch = Math.max(0.12, Math.min(1.5, CAM.pitch + dy * 0.005));
+  }
+  // Mouse: left drag rotates, right drag (or Shift + drag) moves, wheel zooms.
+  // Touch: one finger rotates, two fingers move and pinch to zoom.
+  const pts = new Map();
+  let mode = null, last = null, moved = 0, pinch = 0;
+  el.addEventListener('contextmenu', (e) => e.preventDefault());
+  el.addEventListener('pointerdown', (e) => {
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    el.setPointerCapture(e.pointerId);
+    moved = 0;
+    if (pts.size === 2) {
+      const [p1, p2] = [...pts.values()];
+      mode = 'touch2'; pinch = Math.hypot(p1.x - p2.x, p1.y - p2.y); last = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+    } else { mode = (e.button === 2 || e.shiftKey) ? 'pan' : 'rotate'; last = { x: e.clientX, y: e.clientY }; }
+  });
+  el.addEventListener('pointermove', (e) => {
+    if (!pts.has(e.pointerId) || !mode) return;
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const k = CAM.dist / window.innerHeight * 0.63; // world units per pixel at the target (fov 35°)
+    if (mode === 'touch2' && pts.size >= 2) {
+      const [p1, p2] = [...pts.values()];
+      const c = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 }, d = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+      pan(-(c.x - last.x) * k, (c.y - last.y) * k / Math.max(0.35, Math.sin(CAM.pitch)));
+      if (pinch) zoom = clampZoom(zoom * pinch / d);
+      pinch = d; last = c; moved += 10; return;
+    }
+    const dx = e.clientX - last.x, dy = e.clientY - last.y;
+    moved += Math.abs(dx) + Math.abs(dy);
+    last = { x: e.clientX, y: e.clientY };
+    if (moved < 4) return;
+    if (mode === 'pan') pan(-dx * k, dy * k / Math.max(0.35, Math.sin(CAM.pitch)));
+    else rotate(dx, dy);
+  });
+  const end = (e) => { pts.delete(e.pointerId); if (!pts.size) mode = null; else if (pts.size === 1) { mode = 'rotate'; last = [...pts.values()][0]; } };
+  el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
+  // A drag is not a click on an agent.
+  el.addEventListener('click', (e) => { if (moved >= 4) { e.stopImmediatePropagation(); moved = 0; } }, true);
+  el.addEventListener('wheel', (e) => { e.preventDefault(); zoom = clampZoom(zoom * Math.exp(e.deltaY * 0.0012)); }, { passive: false });
+  // Keyboard: WASD / arrows move, Q E rotate, R F tilt, + - zoom, Home back to the start.
+  const keys = new Set();
+  document.addEventListener('keydown', (e) => {
+    if (/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+    const k = e.key.toLowerCase();
+    if (k === 'home') { resetCamera(); window.unfocusAgent && window.unfocusAgent(); return; }
+    if (k === '+' || k === '=') zoom = clampZoom(zoom / 1.12);
+    if (k === '-') zoom = clampZoom(zoom * 1.12);
+    if (['w', 'a', 's', 'd', 'q', 'e', 'r', 'f', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) { keys.add(k); if (k.startsWith('arrow')) e.preventDefault(); }
+  });
+  document.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
+  window.addEventListener('blur', () => keys.clear());
+  setInterval(() => {
+    if (!keys.size) return;
+    const v = 0.35 * zoom * 2;
+    let dx = 0, dz = 0;
+    if (keys.has('w') || keys.has('arrowup')) dz += v;
+    if (keys.has('s') || keys.has('arrowdown')) dz -= v;
+    if (keys.has('a') || keys.has('arrowleft')) dx -= v;
+    if (keys.has('d') || keys.has('arrowright')) dx += v;
+    if (dx || dz) pan(dx, dz);
+    if (keys.has('q')) rotate(-6, 0);
+    if (keys.has('e')) rotate(6, 0);
+    if (keys.has('r')) rotate(0, 4);
+    if (keys.has('f')) rotate(0, -4);
+  }, 16);
+  document.getElementById('camReset').addEventListener('click', () => { resetCamera(); window.unfocusAgent && window.unfocusAgent(); });
+  // Zoom buttons, wider range than before.
+  ['zoomIn', 'zoomOut'].forEach((id) => document.getElementById(id).addEventListener('click', () => { zoom = clampZoom(zoom * (id === 'zoomIn' ? 0.85 : 1.18)); }));
+})();
 (function () {
   const _select = selectAgent, _close = closeDetail;
   const bar = document.getElementById('focusBar');
@@ -2549,7 +2690,7 @@ updateCamera = function () {
     if (a) document.getElementById('focusName').textContent = `${a.emoji} Siguiendo a ${a.name}`;
     document.querySelectorAll('.user-avatar').forEach((el) => el.classList.toggle('active', el.dataset.agent === id));
   }
-  const unfocusAgent = window.unfocusAgent = function () { _close(); setFocus(null); };
+  const unfocusAgent = window.unfocusAgent = function (keepView) { _close(); setFocus(null); if (!keepView) resetCamera(); };
   selectAgent = function (id) { _select(id); if (AGENTS.some((a) => a.id === id)) setFocus(id); };
   // Closing the card keeps following the agent.
   closeDetail = function () { _close(); if (focusId) setFocus(focusId); };
@@ -2590,7 +2731,15 @@ init();
     },
     tasks() {
       const h = DATA?.hermes || {}, a = DATA?.agents || [];
-      let html = head('📋 Tareas') + '<h4>Ahora mismo</h4>' + a.map((x) => `<div class="row"><span>${esc(x.emoji)} ${esc(x.name)}</span><span>${esc(x.task)}</span></div>`).join('');
+      let html = head('📋 Tareas') + '<h4>Ahora mismo</h4>' + a.map((x) => `<div class="row"><span>${esc(x.emoji)} ${esc(x.name)}</span><span>${esc(x.task.length > 110 ? x.task.slice(0, 109) + '…' : x.task)}</span></div>`).join('');
+      // Encargos por Discord: lo que cada uno está haciendo y lo que ha terminado.
+      const T = DATA?.tasks || [], who = Object.fromEntries(a.map((x) => [x.id, x]));
+      const ago = (t) => { const m = Math.round((Date.now() / 1000 - t) / 60); return m < 1 ? 'ahora' : m < 60 ? `hace ${m} min` : m < 1440 ? `hace ${Math.round(m / 60)} h` : new Date(t * 1000).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }); };
+      const dur = (t) => { const m = Math.round(((t.ended || Date.now() / 1000) - t.started) / 60); return m < 1 ? '<1 min' : m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`; };
+      const item = (t) => `<div class="row task"><span>${esc(who[t.agent]?.emoji || '')} <b>${esc(who[t.agent]?.name || t.agent)}</b><br><span class="muted">de ${esc(t.from)} · ${esc(t.where || '')}</span></span><span>${t.status === 'working' ? '<span class="pill warn">en curso</span>' : '<span class="pill ok">hecho</span>'} <span class="muted">${ago(t.started)} · ${dur(t)}</span><br>${esc(t.text)}</span></div>`;
+      const run = T.filter((t) => t.status === 'working'), done = T.filter((t) => t.status !== 'working').slice(0, 15);
+      html += '<h4>Encargos por Discord · en curso</h4>' + (run.length ? run.map(item).join('') : '<p class="muted">Nadie trabaja en un encargo ahora mismo.</p>');
+      html += '<h4>Encargos terminados</h4>' + (done.length ? done.map(item).join('') : '<p class="muted">Todavía no hay encargos registrados.</p>');
       const k = h.kanban || [];
       html += '<h4>Kanban de Hermes</h4>' + (k.length ? k.map((t) => `<div class="row"><span>${esc(t.title)}</span><span class="pill">${esc(t.status)}</span></div>`).join('') : '<p class="muted">Sin tareas abiertas.</p>');
       const c = h.cron || [];
@@ -2621,7 +2770,8 @@ init();
         + chk('optLabels', labelsVisible, 'Nombres sobre los personajes')
         + chk('optRotate', autoRotate, 'Rotación automática de la cámara')
         + chk('optBubbles', window.__bubblesOn !== false, 'Bocadillos con la tarea')
-        + `<label class="opt">Zoom<input type="range" id="optZoom" min="0.5" max="2.2" step="0.05" value="${zoom}"></label>`
+        + `<label class="opt">Zoom<input type="range" id="optZoom" min="0.12" max="2.2" step="0.05" value="${zoom}"></label>`
+        + '<p class="muted">Cámara: arrastra para girar · clic derecho o Mayús + arrastrar (dos dedos en el móvil) para moverte · rueda o pellizco para el zoom · WASD/flechas, Q/E girar, R/F inclinar, Inicio para volver.</p>'
         + '<p class="muted">Los cambios solo afectan a este navegador.</p>';
     },
   };

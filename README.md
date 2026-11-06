@@ -7,6 +7,9 @@ Fork de [OneByJorah/offivo](https://github.com/OneByJorah/offivo) (licencia MIT)
 - **Agentes reales:** el servicio `feeder` escribe en el panel el estado de Hermes (`~/.hermes/virtoffice/status.json`, su kanban y su cron) y de Claude (procesos `claude -p` en el contenedor `claude-discord`). Ya no salen los agentes de demostración ni frases o estados inventados.
 - **Movimiento:** los personajes calculan rutas (A*) que esquivan los muebles; cuando trabajan van a su puesto y se sientan frente al monitor; libres, pasean.
 - **Botones con función:** 📋 Tareas, 📊 Servidor (carga, memoria, swap, disco, contenedores), ⚙️ Ajustes, 🔒 Bloquear, Equipo y Actividad.
+- **Encargos por Discord:** el feeder registra cada petición que recibe Claude (procesos `claude -p`) y Hermes (su `state.db`, solo lectura): quién la pidió, dónde, cuándo empezó y cuándo terminó. Se ven en 📋 Tareas y en la ficha de cada agente, y deciden a qué área de la oficina va cada uno. El historial se guarda en el volumen `feeder-data`.
+- **Colisiones:** los personajes no atraviesan paredes, muebles ni a otro agente; a las sillas, el sofá y las cabinas entran y salen por su lado.
+- **Cámara libre:** arrastrar gira, clic derecho o Mayús + arrastrar mueve, la rueda acerca (en el móvil: un dedo gira, dos mueven y pellizcar acerca). Teclado: WASD/flechas, Q/E, R/F, +/−, Inicio. ⌂ vuelve a la vista inicial.
 - **Enfocar a un agente:** clic en su icono de arriba; la cámara le sigue. «Vista general», Esc o un segundo clic vuelven a la oficina completa.
 
 ## Despliegue

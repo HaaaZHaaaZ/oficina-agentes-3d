@@ -27,8 +27,13 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       # Estado de Hermes (status.json, kanban, cron), solo lectura.
       - ${HERMES_HOME:-/home/haz/.hermes}:/hermes:ro
+      # Historial de encargos de Discord (sobrevive a redespliegues).
+      - feeder-data:/data
     depends_on: [office]
     restart: unless-stopped
+
+volumes:
+  feeder-data:
 
 networks:
   shared:
