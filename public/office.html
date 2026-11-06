@@ -726,7 +726,7 @@ function applyLiveAgents(newAgents) {
 
 async function fetchAgents() {
   try {
-    const res = await fetch('/api/agents', { cache: 'no-store' });
+    const res = await fetch('api/agents', { cache: 'no-store' });
     if (!res.ok) return;
     const data = await res.json();
     if (Array.isArray(data) && data.length) applyLiveAgents(data);
@@ -735,8 +735,8 @@ async function fetchAgents() {
 
 async function fetchConfig() {
   try {
-    const res = await fetch('/api/config', { cache: 'no-store' });
-    if (res.ok) liveConfig = await res.json();
+    const res = await fetch('api/config', { cache: 'no-store' });
+    if (res.ok) { const c = await res.json(); liveConfig = Object.assign(c, liveConfig.mode === 'live' ? { mode: 'live' } : {}); }
   } catch (e) {}
 }
 
@@ -746,7 +746,7 @@ function startLiveUpdates() {
   setInterval(fetchAgents, 5000);
 
   if (liveConfig.enable_sse) {
-    const es = new EventSource('/events');
+    const es = new EventSource('events');
     es.onmessage = ev => {
       try {
         const data = JSON.parse(ev.data);
@@ -2911,7 +2911,7 @@ init();
 
   async function poll() {
     try {
-      const r = await fetch('/data.json', { cache: 'no-store' });
+      const r = await fetch('data.json', { cache: 'no-store' });
       if (r.ok) DATA = await r.json();
       const a = DATA?.agents || [];
       // The server drops unknown fields from /api/agents: take area/project from data.json.
