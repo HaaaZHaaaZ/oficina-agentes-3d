@@ -555,8 +555,8 @@ body {
   </div>
 
   <div class="notification">
-    <div class="notif-title"><span class="notif-pulse"></span> Gathering in meeting room...</div>
-    <div class="notif-sub" id="meetingSub">4/5 attending — Daily standup</div>
+    <div class="notif-title"><span class="notif-pulse"></span> Conectando con los agentes…</div>
+    <div class="notif-sub" id="meetingSub">Conectando…</div>
   </div>
   <button class="standup-btn" title="Estado del equipo">Equipo</button>
 
@@ -638,11 +638,9 @@ body {
 const AGENTS = (window.__HERMES_AGENTS__ && window.__HERMES_AGENTS__.length)
   ? window.__HERMES_AGENTS__
   : [
-  { id: 'orchestrator', name: 'Orchestrator', color: '#8B5CF6', role: 'Supervisor', emoji: '🧠', home: 'meeting', tasks: ['Reviewing pipeline', 'Coordinating agents', 'Approving handoffs'], output: ['Daily brief issued', 'Pipeline updated'] },
-  { id: 'analyst', name: 'Analyst', color: '#3B82F6', role: 'Research', emoji: '📊', home: 'left', tasks: ['Market research', 'Data synthesis', 'Trend analysis'], output: ['Competitor report', 'Keyword research'] },
-  { id: 'writer', name: 'Writer', color: '#EC4899', role: 'Content', emoji: '✍️', home: 'center', tasks: ['Drafting article', 'Editing copy', 'SEO optimization'], output: ['Blog post v2', 'Thread draft'] },
-  { id: 'marketer', name: 'Marketer', color: '#F59E0B', role: 'Growth', emoji: '📢', home: 'right', tasks: ['Campaign planning', 'Audience targeting', 'Post scheduling'], output: ['Launch plan', 'Campaign brief'] },
-  { id: 'coder', name: 'Coder', color: '#10B981', role: 'Dev', emoji: '💻', home: 'right2', tasks: ['Feature build', 'Code review', 'Deploy checks'], output: ['API endpoint', 'Bug fix merged'] }
+  // Only the real agents, never the original demo cast: until live data arrives they show as connecting.
+  { id: 'hermes', name: 'Hermes', color: '#8B5CF6', role: 'Hermes Agent · GitHub/Portainer', emoji: '☤', home: 'right', status: 'idle', task: 'Conectando…', tasks: ['Conectando…'], output: [] },
+  { id: 'claude', name: 'Claude', color: '#D97757', role: 'Claude Code · servidor', emoji: '🟠', home: 'left', status: 'idle', task: 'Conectando…', tasks: ['Conectando…'], output: [] }
 ];
 
 const STATUS_LABELS = {
@@ -666,7 +664,7 @@ const recentChats = [];
 function resetAgentStates(agentList) {
   agentList.forEach(a => {
     if (!agentStates[a.id]) {
-      agentStates[a.id] = { status: a.status || 'idle', task: a.task || 'Idle', targetX: 0, targetZ: 0, currentX: 0, currentZ: 0 };
+      agentStates[a.id] = { status: a.status || 'idle', task: a.task || 'Libre', targetX: 0, targetZ: 0, currentX: 0, currentZ: 0 };
     }
     agentStates[a.id].status = a.status || agentStates[a.id].status;
     agentStates[a.id].task = a.task || agentStates[a.id].task;
@@ -675,7 +673,7 @@ function resetAgentStates(agentList) {
 }
 
 AGENTS.forEach(a => {
-  agentStates[a.id] = { status: a.status || 'idle', task: a.task || 'Idle', targetX: 0, targetZ: 0, currentX: 0, currentZ: 0 };
+  agentStates[a.id] = { status: a.status || 'idle', task: a.task || 'Libre', targetX: 0, targetZ: 0, currentX: 0, currentZ: 0 };
   agentStats[a.id] = a.stats || { tasksDone: Math.floor(Math.random() * 30) + 8, active: Math.floor(Math.random() * 5) + 1, hours: (Math.random() * 6 + 1).toFixed(1) };
 });
 
@@ -710,7 +708,7 @@ function applyLiveAgents(newAgents) {
       state.status = na.status || state.status;
       state.task = na.task || state.task;
     } else {
-      agentStates[na.id] = { status: na.status || 'idle', task: na.task || 'Idle', targetX: 0, targetZ: 0, currentX: 0, currentZ: 0 };
+      agentStates[na.id] = { status: na.status || 'idle', task: na.task || 'Libre', targetX: 0, targetZ: 0, currentX: 0, currentZ: 0 };
     }
     if (na.stats) agentStats[na.id] = na.stats;
   });
@@ -1183,9 +1181,9 @@ function createChair(x, z, rotation, color) {
 
 function createWorkstations() {
   const positions = [
-    { x: -10.5, z: -2.5, name: 'analyst', angle: Math.PI/2 },
+    { x: -10.5, z: -2.5, name: 'claude', angle: Math.PI/2 },
     { x: -4, z: 1.5, name: 'writer', angle: Math.PI },
-    { x: 7, z: -0.5, name: 'marketer', angle: Math.PI },
+    { x: 7, z: -0.5, name: 'hermes', angle: Math.PI },
     { x: 10.5, z: 2, name: 'coder', angle: -Math.PI/2 },
     { x: -2, z: 7, name: 'open1', angle: 0 },
     { x: 3, z: 6, name: 'open2', angle: 0 },
@@ -1744,7 +1742,7 @@ function selectAgent(agentId) {
   selectedAgent = agent;
   
   const panel = document.getElementById('detail-panel');
-  const state = agentStates[agentId] || { status: agent.status || 'idle', task: agent.task || 'Idle' };
+  const state = agentStates[agentId] || { status: agent.status || 'idle', task: agent.task || 'Libre' };
   const stats = agentStats[agentId] || { tasksDone: 0, active: 0, hours: 0 };
   
   document.getElementById('detailAvatar').textContent = agent.emoji;
@@ -1828,7 +1826,7 @@ function updateBehavior() {
       const angle = Math.random() * Math.PI * 2;
       state.targetX = Math.cos(angle) * 2;
       state.targetZ = -ROOM_DEPTH/2 + 6.5 + Math.sin(angle) * 2;
-      state.task = ['In standup', 'Discussing roadmap', 'Sprint planning', 'Reviewing metrics'][Math.floor(Math.random() * 4)];
+      state.task = (agent.task || 'Conectando…');
       meetingCount++;
     } else if (rand < 0.65) {
       state.status = 'working';
@@ -1842,10 +1840,10 @@ function updateBehavior() {
       state.status = 'walking';
       state.targetX = (Math.random() - 0.5) * (ROOM_WIDTH - 8);
       state.targetZ = (Math.random() - 0.5) * (ROOM_DEPTH - 8);
-      state.task = ['Coffee run', 'Water cooler chat', 'Walking break', 'Changing desk'][Math.floor(Math.random() * 4)];
+      state.task = (agent.task || 'Conectando…');
     } else {
       state.status = 'idle';
-      state.task = 'Taking a break';
+      state.task = (agent.task || 'Conectando…');
       const home = getHomePosition(agent.home);
       state.targetX = home.x;
       state.targetZ = home.z;
@@ -1853,7 +1851,6 @@ function updateBehavior() {
   });
   
   // Update meeting notification
-  if (liveConfig.mode !== 'live') document.getElementById('meetingSub').textContent = `${Math.max(meetingCount, 2)}/5 attending — Daily standup`;
   
   updateStatusBar();
 }
@@ -2150,7 +2147,6 @@ function animate() {
   // Update meeting notification periodically
   if (Date.now() - lastMeetingUpdate > 5000) {
     const meetingCount = AGENTS.filter(a => agentStates[a.id].status === 'meeting').length;
-    if (liveConfig.mode !== 'live') document.getElementById('meetingSub').textContent = `${Math.max(meetingCount, 1)}/5 attending — Daily standup`;
     updateStatusBar();
     lastMeetingUpdate = Date.now();
   }
@@ -2859,7 +2855,11 @@ init();
       $('.notif-title').innerHTML = `<span class="notif-pulse"></span> ${busy ? `${busy} ${busy === 1 ? 'agente trabajando' : 'agentes trabajando'}` : 'Todos libres'}`;
       $('#meetingSub').textContent = a.map((x) => `${x.name}: ${(ST[x.status] || [x.status])[0]}`).join(' · ');
       if (view && view !== 'settings') render();
-    } catch (e) {}
+      if (!r.ok) throw new Error(r.status);
+    } catch (e) {
+      $('.notif-title').innerHTML = '⚠️ Sin datos en vivo del servidor';
+      $('#meetingSub').textContent = 'Reintentando cada 5 s…';
+    }
   }
   poll(); setInterval(poll, 5000);
 })();
