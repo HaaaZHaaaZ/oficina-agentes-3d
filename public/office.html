@@ -2214,6 +2214,12 @@ function createZones() {
     top.position.y = H;
     const base = new THREE.Mesh(new THREE.BoxGeometry(horiz ? len : 0.12, 0.12, horiz ? 0.12 : len), frame);
     base.position.y = 0.06;
+    // Posts at both ends, so door openings read as doors.
+    [-1, 1].forEach((e) => {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.12, H, 0.12), frame);
+      post.position.set(horiz ? e * len / 2 : 0, H / 2, horiz ? 0 : e * len / 2);
+      g.add(post);
+    });
     g.add(pane, top, base);
     g.position.set((x1 + x2) / 2, 0, (z1 + z2) / 2);
     scene.add(g);
@@ -2375,11 +2381,28 @@ function nearestFree(i, j) {
   return [i, j];
 }
 
+// Every cell the segment a-b touches must be free (supercover walk, not sampled points, so it
+// cannot clip the corner of a desk), and it must not cross a glass wall.
 function lineFree(a, b) {
-  const steps = Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / (NAV.cell * 0.5));
-  for (let k = 1; k < steps; k++) {
-    const [i, j] = toCell(a.x + (b.x - a.x) * k / steps, a.z + (b.z - a.z) * k / steps);
-    if (!navFree(i, j)) return false;
+  if (crossesWall(a, b)) return false;
+  const c = NAV.cell, ox = ROOM_WIDTH / 2, oz = ROOM_DEPTH / 2;
+  let [i, j] = toCell(a.x, a.z);
+  const [i1, j1] = toCell(b.x, b.z);
+  const dx = b.x - a.x, dz = b.z - a.z;
+  const si = Math.sign(dx), sj = Math.sign(dz);
+  const tdx = si ? c / Math.abs(dx) : Infinity, tdz = sj ? c / Math.abs(dz) : Infinity;
+  let tx = si ? ((si > 0 ? (i + 1) * c : i * c) - (a.x + ox)) / dx : Infinity;
+  let tz = sj ? ((sj > 0 ? (j + 1) * c : j * c) - (a.z + oz)) / dz : Infinity;
+  for (let guard = 0; guard < 2000; guard++) {
+    if (!navFree(i, j) && guard > 0) return false;
+    if (i === i1 && j === j1) return true;
+    if (Math.abs(tx - tz) < 1e-9) { // through a corner: both neighbours must be free
+      if (!navFree(i + si, j) || !navFree(i, j + sj)) return false;
+      i += si; j += sj; tx += tdx; tz += tdz;
+    } else if (tx < tz) { i += si; tx += tdx; } else { j += sj; tz += tdz; }
+    if (Math.min(tx, tz) > 1 + 1e-9 && !(i === i1 && j === j1)) { // numerical end
+      return navFree(i, j) && navFree(i1, j1);
+    }
   }
   return true;
 }
@@ -2485,12 +2508,17 @@ function navGoalFor(a) {
         const s = agentStates[a.agent.id];
         if (!s) return;
         if (a.seated) { s.targetX = a.group.position.x; s.targetZ = a.group.position.z; return; }
+        // Walk through each waypoint (not 0.4 m short of it, which cut corners into desks and glass):
+        // aim a little beyond it along the segment and move on once it is reached.
         if (a.path && a.path.length) {
           const wp = a.path[0];
-          if (Math.hypot(wp.x - a.group.position.x, wp.z - a.group.position.z) < 0.42) a.path.shift();
+          if (Math.hypot(wp.x - a.group.position.x, wp.z - a.group.position.z) < 0.12) a.path.shift();
         }
         const wp = a.path && a.path[0];
-        if (wp) { s.targetX = wp.x; s.targetZ = wp.z; }
+        if (wp) {
+          const dx = wp.x - a.group.position.x, dz = wp.z - a.group.position.z, d = Math.hypot(dx, dz) || 1;
+          s.targetX = wp.x + dx / d * 0.45; s.targetZ = wp.z + dz / d * 0.45;
+        }
         else { s.targetX = a.group.position.x; s.targetZ = a.group.position.z; }
         if ((!a.path || !a.path.length) && a.navGoal && a.navGoal.seat && !a.seated
             && Math.hypot(a.navGoal.seat.x - a.group.position.x, a.navGoal.seat.z - a.group.position.z) < 1.2) {
@@ -2519,8 +2547,12 @@ function navGoalFor(a) {
           if (a.waited < 2) block = true;
         } else a.waited = 0;
       }
+      const glass = crossesWall(b, p);
+      // Furniture: if something stops it for a second, let it brush past for a moment rather than freeze.
+      if ((a.blocked || 0) > 1) { a.brush = 1.5; a.blocked = 0; }
+      if (a.brush > 0) { a.brush -= delta; if (!glass) block = false; }
       if (block) { p.x = b.x; p.z = b.z; a.blocked = (a.blocked || 0) + delta; } else a.blocked = 0;
-      if (a.blocked > 3) { a.blocked = 0; a.navGoal = null; a.path = []; } // stuck: plan again
+      if (glass) { a.navGoal = null; a.path = []; a.blocked = 0; updateBehavior(); } // never through glass: plan again now
     });
     agents.forEach((a) => {
       const st = agentStates[a.agent.id];
