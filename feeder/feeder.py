@@ -65,7 +65,8 @@ def claude_requests():
         w = list(re.finditer(r"\[([^\]]{1,40})\] te escribe:", prompt))
         who = w[-1].group(1) if w else "Discord"
         text = short(prompt[w[-1].end():] if w else prompt[len("claude -p"):])
-        out.append({"key": f"c{p[ipid]}-{p[istime]}", "who": who, "text": text,
+        sid = re.search(r"--resume ([0-9a-f-]{36})", args)
+        out.append({"key": f"c{p[ipid]}-{p[istime]}", "who": who, "text": text, "session": sid.group(1) if sid else None,
                     "where": f"Proyecto «{m.group(1)}»" if m else "#ubuntu-server",
                     "project": m.group(1) if m else None, "from_hermes": "(Este mensaje es de Hermes" in args})
     return out
@@ -245,6 +246,7 @@ def hermes_tasks(now):
         c.close()
     except Exception as e:
         return {"error": str(e)}
+    hermes_actions(rows)
     open_by_session, last_activity = {}, 0
     for mid, sid, role, content, tool_calls, ts, name in rows:
         last_activity = max(last_activity, ts)
@@ -272,15 +274,173 @@ def hermes_tasks(now):
     return {}
 
 
+# --- Acciones (comandos, lecturas, ediciones) y ayudantes que las representan ---
+ACTIONS_FILE = os.environ.get("ACTIONS_FILE", "/data/actions.json")
+CLAUDE_PROJECTS = "/claude"
+HELPERS = {
+    "operador": {"name": "Operador", "emoji": "🐳", "color": "#38BDF8", "role": "Ayudante · comandos y servidores", "home": "right2", "area": "server"},
+    "explorador": {"name": "Explorador", "emoji": "🔎", "color": "#F59E0B", "role": "Ayudante · lee y busca", "home": "center", "area": "research"},
+    "constructor": {"name": "Constructor", "emoji": "🛠️", "color": "#10B981", "role": "Ayudante · escribe código", "home": "meeting", "area": "project"},
+}
+REPLAY_EVERY = 5     # seconds each action stays on show before the next one (one feeder tick)
+REPLAY_QUEUE = 8     # at most this many waiting per helper: the replay never falls far behind
+REPLAY_MAX_AGE = 900  # older actions are listed but not acted out
+STAY_BUSY = 40       # a helper keeps working this long after its last action
+
+
+def load_json(path, default):
+    try:
+        return json.load(open(path))
+    except Exception:
+        return default
+
+
+ACTIONS = load_json(ACTIONS_FILE, [])
+SEEN_ACTIONS = {a["id"] for a in ACTIONS}
+HELPER_STATE = {h: {"queue": [], "current": None, "shown_at": 0} for h in HELPERS}
+
+
+BORING = {"cd", "sleep", "echo", "export", "true", "set", "then", "do", "done", "fi", "if", "for", "while", "else"}
+
+
+def programs(cmd):
+    """'TOKEN=$(curl ...) && cd x && git push' -> 'curl → git' (never arguments: they may hold secrets)."""
+    out = []
+    for w in re.findall(r"(?:^|&&|\|\||;|\||\$\(|`|\n)\s*([A-Za-z][\w.+-]*)(?=\s|$)", cmd or ""):
+        w = os.path.basename(w)[:20]
+        if w not in BORING and w not in out:
+            out.append(w)
+    return " → ".join(out[:4]) or "comando"
+
+
+def describe(tool, args):
+    """(helper, text) for one tool call, or None for chat/meta tools."""
+    t = tool.lower()
+    base = lambda v: os.path.basename(str(v or "").rstrip("/")) or str(v or "")
+    if t in ("read", "read_file", "view", "notebookread"):
+        return "explorador", f"📖 Leyendo {base(args.get('file_path') or args.get('path'))}"
+    if t in ("grep", "glob", "search_files", "search", "find_files"):
+        return "explorador", f"🔎 Buscando «{short(str(args.get('pattern') or args.get('query') or ''), 40)}»"
+    if t in ("websearch", "web_search"):
+        return "explorador", f"🌐 Buscando en la web «{short(str(args.get('query') or ''), 40)}»"
+    if t in ("webfetch", "web_fetch", "browse", "browser_navigate"):
+        return "explorador", "🌐 Consultando una página web"
+    if t in ("edit", "write", "multiedit", "notebookedit", "patch", "write_file", "edit_file", "str_replace"):
+        return "constructor", f"✏️ Editando {base(args.get('file_path') or args.get('path'))}"
+    if t in ("agent", "task", "delegate"):
+        return "constructor", f"🤝 Delegando: {short(str(args.get('description') or ''), 50)}"
+    if t in ("bash", "terminal", "shell", "execute_command", "run_command"):
+        cmd = str(args.get("command") or "")
+        text = args.get("description") or programs(cmd)
+        helper = "constructor" if re.search(r"git commit|sed -i|npm run build|pytest|\btsc\b|py_compile", cmd) else "operador"
+        return helper, f"💻 {short(str(text), 70)}"
+    return None
+
+
+def add_action(aid, agent, ts, tool, args):
+    if aid in SEEN_ACTIONS:
+        return
+    SEEN_ACTIONS.add(aid)
+    d = describe(tool, args if isinstance(args, dict) else {})
+    if not d:
+        return
+    act = {"id": aid, "agent": agent, "t": ts, "helper": d[0], "text": d[1]}
+    ACTIONS.append(act)
+    if time.time() - ts < REPLAY_MAX_AGE:
+        q = HELPER_STATE[d[0]]["queue"]
+        q.append(act)
+        q.sort(key=lambda a: a["t"])
+        del q[:-REPLAY_QUEUE]
+
+
+def claude_actions():
+    """Tool calls in the transcripts of the running `claude -p` sessions."""
+    for p in CLAUDE_PROCS:
+        sid = p.get("session")
+        if not sid:
+            continue
+        for d in os.listdir(CLAUDE_PROJECTS) if os.path.isdir(CLAUDE_PROJECTS) else []:
+            f = os.path.join(CLAUDE_PROJECTS, d, sid + ".jsonl")
+            if not os.path.exists(f):
+                continue
+            with open(f, "rb") as fh:
+                fh.seek(max(0, os.path.getsize(f) - 400_000))
+                lines = fh.read().decode("utf-8", "ignore").splitlines()[1:]
+            for line in lines:
+                if '"tool_use"' not in line:
+                    continue
+                try:
+                    e = json.loads(line)
+                    ts = time.mktime(time.strptime(e["timestamp"][:19], "%Y-%m-%dT%H:%M:%S")) - time.timezone
+                except Exception:
+                    continue
+                for c in (e.get("message") or {}).get("content") or []:
+                    if isinstance(c, dict) and c.get("type") == "tool_use":
+                        add_action("c" + c.get("id", ""), "claude", ts, c.get("name", ""), c.get("input") or {})
+
+
+def hermes_actions(rows):
+    for mid, sid, role, content, tool_calls, ts, name in rows:
+        if role != "assistant" or not tool_calls or time.time() - ts > 6 * 3600:
+            continue
+        try:
+            calls = json.loads(tool_calls)
+        except Exception:
+            continue
+        for k, c in enumerate(calls):
+            f = c.get("function") or {}
+            try:
+                args = json.loads(f.get("arguments") or "{}")
+            except Exception:
+                args = {}
+            add_action(f"h{mid}-{k}", "hermes", ts, f.get("name", ""), args)
+
+
+def helper_agents(now):
+    out = []
+    for hid, h in HELPERS.items():
+        st = HELPER_STATE[hid]
+        st["queue"] = [a for a in st["queue"] if now - a["t"] < REPLAY_MAX_AGE]
+        if st["queue"] and now - st["shown_at"] >= REPLAY_EVERY:
+            st["current"], st["shown_at"] = st["queue"].pop(0), now
+        cur = st["current"]
+        busy = cur is not None and (st["queue"] or now - st["shown_at"] < STAY_BUSY)
+        who = {"claude": "Claude", "hermes": "Hermes"}.get(cur["agent"], "") if cur else ""
+        task = f"{cur['text']} · para {who}" if busy else "Libre: descansando"
+        out.append({
+            "id": hid, "name": h["name"], "role": h["role"], "emoji": h["emoji"], "color": h["color"], "home": h["home"],
+            "status": "working" if busy else "idle", "typing": bool(busy), "area": h["area"] if busy else "rest",
+            "project": None, "helper": True, "for": cur["agent"] if busy else None,
+            "task": task, "tasks": [task] + [f"En cola: {a['text']}" for a in st["queue"][:4]],
+            "output": [a["text"] for a in reversed(ACTIONS) if a["helper"] == hid][:5], "mood": 0.85,
+            "stats": {"tasksDone": sum(1 for a in ACTIONS if a["helper"] == hid and time.strftime("%Y-%m-%d", time.localtime(a["t"])) == time.strftime("%Y-%m-%d")),
+                      "active": len(st["queue"]) + (1 if busy else 0), "hours": 0},
+        })
+    return out
+
+
 def update_tasks():
     now = time.time()
     before = json.dumps(TASKS, sort_keys=True)
     claude_tasks(now)
     hermes_tasks(now)
+    n = len(ACTIONS)
+    try:
+        claude_actions()
+    except Exception as e:
+        print("claude actions error:", e, flush=True)
     TASKS.sort(key=lambda t: t["started"])
     del TASKS[:-150]
     if json.dumps(TASKS, sort_keys=True) != before:
         save_tasks(TASKS)
+    if len(ACTIONS) != n:
+        ACTIONS.sort(key=lambda a: a["t"])
+        del ACTIONS[:-300]
+        try:
+            json.dump(ACTIONS, open(ACTIONS_FILE + ".tmp", "w"), ensure_ascii=False)
+            os.replace(ACTIONS_FILE + ".tmp", ACTIONS_FILE)
+        except Exception as e:
+            print("actions save error:", e, flush=True)
 
 
 def current_task(agent):
@@ -313,6 +473,8 @@ def done_today(agent):
 def note_changes(prev, agents):
     old = {a["id"]: (a["status"], a["task"]) for a in (prev or [])}
     for a in agents:
+        if a.get("helper"):
+            continue  # helpers change every few seconds: their actions are listed apart
         if old.get(a["id"]) != (a["status"], a["task"]):
             EVENTS.insert(0, {"t": time.strftime("%H:%M:%S"), "who": a["name"], "status": a["status"], "task": a["task"]})
     del EVENTS[60:]
@@ -389,13 +551,14 @@ while True:
     try:
         CLAUDE_PROCS[:] = claude_requests()
         update_tasks()
-        agents = [hermes_state(), claude_state()]
-        h, c = agents
+        main = [hermes_state(), claude_state()]
+        h, c = main
         if h["project"] and c["project"] and h["project"].lower() == c["project"].lower():
             h["area"] = c["area"] = "meeting"
-        for a in agents:
+        for a in main:
             if a["area"] != "rest" and a["project"] and a["area"] == "desk":
                 a["area"] = "project"
+        agents = main + helper_agents(time.time())
         key = json.dumps(agents, sort_keys=True)
         if key != last:
             note_changes(prev, agents)
@@ -405,7 +568,8 @@ while True:
             data = {"updated": time.strftime("%H:%M:%S"), "agents": agents, "events": EVENTS,
                     "hermes": hermes_extra(), "metrics": metrics(),
                     "tasks": [dict(t, started=int(t["started"]), ended=int(t["ended"]) if t["ended"] else None)
-                              for t in reversed(TASKS[-60:])]}
+                              for t in reversed(TASKS[-60:])],
+                    "actions": [dict(a, t=int(a["t"])) for a in reversed(ACTIONS[-80:])]}
             put_file("/app/public", "data.json", json.dumps(data, ensure_ascii=False).encode())
         tick += 1
     except Exception as e:

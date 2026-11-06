@@ -1396,7 +1396,7 @@ function createPlants() {
     [-ROOM_WIDTH/2 + 1, -ROOM_DEPTH/2 + 1],
     [ROOM_WIDTH/2 - 1.2, -ROOM_DEPTH/2 + 1.5],
     [-ROOM_WIDTH/2 + 1.2, ROOM_DEPTH/2 - 1.5],
-    [ROOM_WIDTH/2 - 2, ROOM_DEPTH/2 - 1.5],
+    [11.6, ROOM_DEPTH/2 - 1.2],               // moved out of the spa corner
     [0, ROOM_DEPTH/2 - 1.5],
     [-8, -8],
     [12, -6],
@@ -2264,6 +2264,46 @@ function createZones() {
   floorLabel(AREAS.project.name, 3, 4.6, AREAS.project.color);
   floorLabel(AREAS.rest.name, 9.5, 11.6, AREAS.rest.color);
   floorLabel(AREAS.phone.name, 15.5, -5.2, AREAS.phone.color);
+  createSpa(wall, floorLabel, tint);
+}
+
+/* --- Baño con piscina (esquina delantera derecha) --- */
+const SPA = { x0: 12.5, z0: 4, pool: { x0: 14.4, x1: 18.0, z0: 8.4, z1: 12.2 } };
+function createSpa(wall, floorLabel, tint) {
+  const W = ROOM_WIDTH / 2, D = ROOM_DEPTH / 2, P = SPA.pool;
+  const mat = (color, extra = {}) => new THREE.MeshStandardMaterial(Object.assign({ color, roughness: 0.6 }, extra));
+  const box = (w, h, d, m, x, y, z) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); o.castShadow = true; scene.add(o); return o; };
+  // Glass walls: along the office (door on the west side) and the WC cubicle.
+  wall(SPA.x0, SPA.z0, W, SPA.z0);
+  wall(SPA.x0, SPA.z0, SPA.x0, 5.2); wall(SPA.x0, 7.0, SPA.x0, D);
+  wall(17.2, SPA.z0, 17.2, 4.7); wall(17.2, 5.7, 17.2, 6.2); wall(17.2, 6.2, W, 6.2);
+  tint(SPA.x0, SPA.z0, W, D, '#38BDF8');
+  floorLabel('Baño y piscina', 15.3, 7.75, '#0EA5E9');
+  // Pool: raised basin, tiled bottom, translucent water and a ladder.
+  const stone = mat(0xe8e2d6), t = 0.25, H = 0.5;
+  box(P.x1 - P.x0, H, t, stone, (P.x0 + P.x1) / 2, H / 2, P.z0 + t / 2);
+  box(P.x1 - P.x0, H, t, stone, (P.x0 + P.x1) / 2, H / 2, P.z1 - t / 2);
+  box(t, H, P.z1 - P.z0, stone, P.x0 + t / 2, H / 2, (P.z0 + P.z1) / 2);
+  box(t, H, P.z1 - P.z0, stone, P.x1 - t / 2, H / 2, (P.z0 + P.z1) / 2);
+  const bottom = new THREE.Mesh(new THREE.PlaneGeometry(P.x1 - P.x0 - 2 * t, P.z1 - P.z0 - 2 * t), new THREE.MeshBasicMaterial({ color: 0x1e88c8 }));
+  bottom.rotation.x = -Math.PI / 2; bottom.position.set((P.x0 + P.x1) / 2, 0.025, (P.z0 + P.z1) / 2); scene.add(bottom);
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(P.x1 - P.x0 - 2 * t, P.z1 - P.z0 - 2 * t),
+    new THREE.MeshStandardMaterial({ color: 0x5ccdf5, transparent: true, opacity: 0.55, roughness: 0.05, metalness: 0.2, depthWrite: false }));
+  water.rotation.x = -Math.PI / 2; water.position.set((P.x0 + P.x1) / 2, 0.4, (P.z0 + P.z1) / 2); water.userData.water = true; scene.add(water);
+  const steel = mat(0xc0c6cc, { metalness: 0.8, roughness: 0.25 });
+  [15.6, 16.1].forEach((x) => { box(0.05, 0.9, 0.05, steel, x, 0.45, P.z0 - 0.05); box(0.05, 0.05, 0.35, steel, x, 0.9, P.z0 + 0.12); });
+  // Lounger next to the pool.
+  box(0.7, 0.3, 1.8, mat(0xffffff), 13.4, 0.15, 10.2);
+  const back = box(0.7, 0.08, 0.6, mat(0x38bdf8), 13.4, 0.5, 9.45); back.rotation.x = -0.6;
+  box(0.66, 0.06, 1.2, mat(0x38bdf8), 13.4, 0.33, 10.5);
+  // Bathroom: sink, shower and the WC in its cubicle.
+  box(1.4, 0.85, 0.5, mat(0xf4f4f5), 15.4, 0.425, SPA.z0 + 0.3);
+  box(0.5, 0.06, 0.35, mat(0xd4e8f4), 15.4, 0.88, SPA.z0 + 0.3);
+  box(0.05, 0.25, 0.05, steel, 15.4, 1.0, SPA.z0 + 0.12);
+  box(1.1, 0.06, 1.1, mat(0xf4f4f5), 13.15, 0.03, SPA.z0 + 0.65);
+  box(0.05, 2.0, 0.05, steel, 13.15, 1.0, SPA.z0 + 0.12); box(0.25, 0.04, 0.25, steel, 13.15, 2.0, SPA.z0 + 0.3);
+  const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.17, 0.42, 16), mat(0xffffff)); bowl.position.set(18.45, 0.21, 5.2); bowl.castShadow = true; scene.add(bowl);
+  box(0.2, 0.55, 0.45, mat(0xffffff), 18.78, 0.55, 5.2);
 }
 
 // Sitting spot on the chair closest to (x, z), facing (fx, fz).
@@ -2302,7 +2342,16 @@ function buildSpots() {
     stand(-4.4, 10.5, -2, 10.5), stand(0.4, 10.5, -2, 10.5),            // ping-pong
     stand(-15.8, -4, -W, -4),                                           // agua
   ];
-  SPOTS.rest.forEach((sp) => { if (sp.sofa) sp.approach = approachPoint(sp.x, sp.z, sp.face); });
+  // Baño y piscina: swim in the pool, lie on the lounger, wash hands, the WC.
+  const P = SPA.pool;
+  SPOTS.rest.push(
+    { x: 15.2, z: 10.0, face: 0, sit: false, enter: true, swim: true, approach: { x: 15.2, z: 7.45 } },
+    { x: 17.0, z: 10.9, face: Math.PI, sit: false, enter: true, swim: true, approach: { x: 17.0, z: 7.45 } },
+    { x: 13.4, z: 10.4, face: Math.PI, sit: true, sofa: true, lounger: true },
+    { x: 15.4, z: 5.15, face: Math.PI, sit: false },
+    { x: 18.4, z: 5.2, face: -Math.PI / 2, sit: true, approach: { x: 16.6, z: 5.2 } },
+  );
+  SPOTS.rest.forEach((sp) => { if (sp.sofa && !sp.approach) sp.approach = approachPoint(sp.x, sp.z, sp.lounger ? -Math.PI / 2 : sp.face); });
 }
 
 function toCell(x, z) {
@@ -2451,10 +2500,14 @@ function navGoalFor(a) {
   // Keep the current spot while the area does not change (rest: change now and then).
   if (a.navGoal && a.navArea === area && (area !== 'rest' || Math.random() < 0.85)) return a.navGoal;
   a.navArea = area;
+  // Never two agents on the same spot: take the first free one (helpers came with three more people).
+  const taken = (sp) => sp && agents.some((o) => o !== a && o.navGoal && Math.hypot(o.navGoal.x - sp.x, o.navGoal.z - sp.z) < 0.3);
+  const firstFree = (list, start) => { for (let k = 0; k < list.length; k++) { const sp = list[(start + k) % list.length]; if (sp && !taken(sp)) return sp; } return null; };
   let spot;
-  if (area === 'desk') spot = SPOTS.desk[ag.id] || SPOTS.project[idx % 3];
-  else if (area === 'rest') spot = SPOTS.rest[Math.floor(Math.random() * SPOTS.rest.length)];
-  else spot = (SPOTS[area] || SPOTS.project)[idx % (SPOTS[area] || SPOTS.project).length];
+  if (area === 'desk') spot = (!taken(SPOTS.desk[ag.id]) && SPOTS.desk[ag.id]) || firstFree(SPOTS.project, idx);
+  else if (area === 'rest') spot = firstFree(SPOTS.rest, Math.floor(Math.random() * SPOTS.rest.length));
+  else spot = firstFree(SPOTS[area] || SPOTS.project, idx) || firstFree(SPOTS.project, idx);
+  if (!spot) spot = firstFree(SPOTS.rest, Math.floor(Math.random() * SPOTS.rest.length));
   if (!spot) return a.navGoal || { x: 0, z: 0 };
   return { x: spot.x, z: spot.z, seat: spot.sit ? spot : null, stand: spot.sit ? null : spot, enter: !!spot.enter, approach: spot.approach || null };
 }
@@ -2559,6 +2612,13 @@ function navGoalFor(a) {
         while (d > Math.PI) d -= Math.PI * 2;
         while (d < -Math.PI) d += Math.PI * 2;
         a.group.rotation.y += d * 0.15;
+      }
+      // Swimming: down in the water up to the shoulders, crawl with the arms.
+      if (a.navGoal && a.navGoal.stand && a.navGoal.stand.swim && (!a.path || !a.path.length)
+          && Math.hypot(a.navGoal.x - a.group.position.x, a.navGoal.z - a.group.position.z) < 0.3) {
+        a.group.position.y = -0.85 + Math.sin(a.time * 2) * 0.05;
+        a.leftArm.rotation.x = Math.sin(a.time * 3) * 1.6; a.rightArm.rotation.x = Math.sin(a.time * 3 + Math.PI) * 1.6;
+        a.label.position.set(a.group.position.x, a.group.position.y + 2.3, a.group.position.z);
       }
       const legs = [[a.leftLeg, a.leftLowerLeg], [a.rightLeg, a.rightLowerLeg]];
       if (!a.seated || !a.navGoal || !a.navGoal.seat) {
@@ -2789,8 +2849,13 @@ init();
         + cs.map((c) => `<div class="row"><span>${esc(c.name)}</span><span class="${c.state === 'running' ? (/unhealthy/.test(c.status) ? 'bad' : 'ok') : 'muted'}">${esc(c.status)}</span></div>`).join('');
     },
     activity() {
-      const e = DATA?.events || [];
-      return head('💬 Actividad') + (e.length ? e.map((x) => `<div class="row"><span><span class="muted">${esc(x.t)}</span> <b>${esc(x.who)}</b></span><span>${st(x.status)} ${esc(x.task)}</span></div>`).join('') : '<p class="muted">Sin cambios desde que arrancó el panel.</p>');
+      const e = DATA?.events || [], acts = DATA?.actions || [];
+      const H = { operador: '🐳', explorador: '🔎', constructor: '🛠️' }, N = { claude: '🟠 Claude', hermes: '☤ Hermes' };
+      const hhmm = (t) => new Date(t * 1000).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      return head('💬 Actividad')
+        + '<h4>Lo que están haciendo (comandos, lecturas, ediciones)</h4>'
+        + (acts.length ? acts.slice(0, 40).map((x) => `<div class="row task"><span><span class="muted">${hhmm(x.t)}</span> <b>${esc(N[x.agent] || x.agent)}</b> <span class="muted">· ${H[x.helper] || ''} lo representa</span></span><span>${esc(x.text)}</span></div>`).join('') : '<p class="muted">Sin acciones todavía.</p>')
+        + '<h4>Cambios de estado</h4>' + (e.length ? e.map((x) => `<div class="row"><span><span class="muted">${esc(x.t)}</span> <b>${esc(x.who)}</b></span><span>${st(x.status)} ${esc(x.task)}</span></div>`).join('') : '<p class="muted">Sin cambios desde que arrancó el panel.</p>');
     },
     settings() {
       const chk = (id, on, txt) => `<label class="opt">${txt}<input type="checkbox" id="${id}" ${on ? 'checked' : ''}></label>`;
@@ -2851,9 +2916,10 @@ init();
       const a = DATA?.agents || [];
       // The server drops unknown fields from /api/agents: take area/project from data.json.
       a.forEach((x) => { const ag = AGENTS.find((y) => y.id === x.id); if (ag) { ag.area = x.area; ag.project = x.project; } });
-      const busy = a.filter((x) => x.status === 'working').length;
+      const HELP = ['operador', 'explorador', 'constructor'], main = a.filter((x) => !HELP.includes(x.id));
+      const busy = main.filter((x) => x.status === 'working').length, hb = a.filter((x) => HELP.includes(x.id) && x.status === 'working').length;
       $('.notif-title').innerHTML = `<span class="notif-pulse"></span> ${busy ? `${busy} ${busy === 1 ? 'agente trabajando' : 'agentes trabajando'}` : 'Todos libres'}`;
-      $('#meetingSub').textContent = a.map((x) => `${x.name}: ${(ST[x.status] || [x.status])[0]}`).join(' · ');
+      $('#meetingSub').textContent = main.map((x) => `${x.name}: ${(ST[x.status] || [x.status])[0]}`).join(' · ') + (hb ? ` · ${hb} ${hb === 1 ? 'ayudante' : 'ayudantes'} en marcha` : '');
       if (view && view !== 'settings') render();
       if (!r.ok) throw new Error(r.status);
     } catch (e) {
