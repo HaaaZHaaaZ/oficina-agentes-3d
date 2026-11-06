@@ -507,7 +507,7 @@ body {
 #vpanel .bar i { display: block; height: 100%; background: #8B5CF6; }
 #vpanel .muted { color: #8a8aa0; font-size: 12px; }
 #vpanel label.opt { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; cursor: pointer; }
-#lockscreen { position: fixed; inset: 0; z-index: 90; display: none; place-items: center; background: rgba(8,8,14,.82);
+#lockscreen { position: fixed; inset: 0; z-index: 1000; pointer-events: auto; display: none; place-items: center; background: rgba(8,8,14,.82);
   backdrop-filter: blur(18px); color: #e8e8f0; text-align: center; }
 #lockscreen.on { display: grid; }
 #lockscreen button { margin-top: 14px; padding: 10px 18px; border-radius: 10px; border: 1px solid rgba(255,255,255,.2);
@@ -2827,7 +2827,7 @@ init();
   document.querySelectorAll('.sidebar-icon').forEach((i) => i.addEventListener('click', () => {
     const v = i.dataset.view;
     if (v === 'office') return open(null);
-    if (v === 'lock') { $('#lockscreen').classList.add('on'); return; }
+    if (v === 'lock') { open(null); window.unfocusAgent && window.unfocusAgent(true); $('#lockscreen').classList.add('on'); $('#unlockBtn').focus(); return; }
     open(v);
   }));
   document.querySelectorAll('[data-open]').forEach((i) => { i.style.cursor = 'pointer'; i.addEventListener('click', () => open(i.dataset.open)); });
